@@ -158,7 +158,7 @@
                             <div class="w-8 h-8 rounded-full bg-[#4E6851]/40 text-[#DCC9A9] flex items-center justify-center font-bold text-xs border border-[#4E6851]/60">P2P</div>
                             <div>
                                 <h3 id="current-chat-name" class="text-xs font-bold text-[#DCC9A9]">Выберите контакт или введите ID</h3>
-                                <p id="current-chat-status" class="text-[10px] text-gray-400">Шифрование AES-256 + индивидуальный криптоключ</p>
+                                <p id="current-chat-status" class="text-[10px] text-gray-400">Шифрование AES-256 + мульти-STUN сеть</p>
                             </div>
                         </div>
                         <div class="flex gap-2">
@@ -172,7 +172,7 @@
                     <div id="chat-container" class="flex-1 p-5 overflow-y-auto space-y-3 flex flex-col">
                         <div class="flex justify-center my-auto">
                             <div class="text-center text-gray-400 text-xs glass-card p-6 rounded-2xl max-w-sm border border-[#DCC9A9]/15">
-                                🔒 <strong>Защищенный мессенджер готов.</strong><br>ID скрыты от интерфейса. Используйте сохраненные контакты и индивидуальные криптоключи.
+                                🔒 <strong>Защищенный мессенджер готов.</strong><br>Подключен расширенный пул бесплатных STUN-серверов для уверенной связи через интернет.
                             </div>
                         </div>
                     </div>
@@ -251,7 +251,6 @@
 
     <!-- Логика мессенджера -->
     <script>
-        // Имя пользователя
         let myNickname = localStorage.getItem('tapi_my_nickname') || 'Мой профиль';
         document.getElementById('my-nickname-input').value = myNickname;
 
@@ -264,9 +263,9 @@
             }
         }
 
-        // IndexedDB для контактов
+        // IndexedDB для контактов и истории сообщений
         let db;
-        const dbRequest = indexedDB.open('TapiTapDB', 2);
+        const dbRequest = indexedDB.open('TapiTapDB', 3);
 
         dbRequest.onupgradeneeded = function(e) {
             db = e.target.result;
@@ -327,21 +326,30 @@
             }
         }
 
-        // Постоянный ID
+        // Надежный длинный постоянный ID
         let savedId = localStorage.getItem('tapi_tap_persistent_id');
         if (!savedId) {
-            const array = new Uint8Array(16);
+            const array = new Uint8Array(24);
             window.crypto.getRandomValues(array);
-            savedId = 'tapi-' + Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+            const hex = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+            savedId = 'tapi-secure-' + hex;
             localStorage.setItem('tapi_tap_persistent_id', savedId);
         }
 
+        // Расширенный набор надежных публичных STUN-серверов для стабильного P2P соединения
         const peer = new Peer(savedId, {
             debug: 1,
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' },
+                    { urls: 'stun:stun4.l.google.com:19302' },
+                    { urls: 'stun:global.stun.twilio.com:3478' },
+                    { urls: 'stun:stun.services.mozilla.com' },
+                    { urls: 'stun:stun.sipgate.net' },
+                    { urls: 'stun:stun.ekiga.net' }
                 ]
             }
         });
@@ -352,7 +360,7 @@
         let localStream = null;
         let remoteStream = null;
         let pendingConnection = null;
-        let currentCryptoKey = null; // Индивидуальный криптоключ сеанса
+        let currentCryptoKey = null;
 
         const $ = id => document.getElementById(id);
         const chat = $('chat-container');
@@ -387,6 +395,13 @@
 
         peer.on('open', (id) => { myId = id; });
 
+        peer.on('error', (err) => {
+            console.error('Peer error:', err);
+            if (err.type === 'peer-unavailable') {
+                addSystemMessage('⚠️ Ошибка: Собеседник не в сети или блокирует соединение. Проверьте ID.');
+            }
+        });
+
         // Входящий запрос
         peer.on('connection', (conn) => {
             pendingConnection = conn;
@@ -409,11 +424,12 @@
             $('incoming-modal').classList.add('hidden');
 
             if (pendingConnection) {
-                // Генерируем индивидуальный криптоключ для этого пользователя
-                const cryptoKey = 'sec-' + Math.random().toString(36).substring(2, 10);
+                const array = new Uint8Array(20);
+                window.crypto.getRandomValues(array);
+                const cryptoKey = 'sec-' + Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+
                 saveContactToDB({ id: pendingConnection.peer, name: customName, cryptoKey: cryptoKey });
                 
-                // Отправляем подтверждение и ключ
                 pendingConnection.send(JSON.stringify({ type: 'auth_accept', nickname: myNickname, cryptoKey: cryptoKey }));
                 setupConnection(pendingConnection, cryptoKey);
                 $('current-chat-name').textContent = customName;
@@ -431,18 +447,20 @@
         function connectToPeer(remoteId) {
             if (!remoteId || remoteId === myId) return alert('Введите корректный ID');
             
-            // Проверяем, есть ли контакт в базе и есть ли у него криптоключ
             const tx = db.transaction('contacts', 'readonly');
             const store = tx.objectStore('contacts');
             const req = store.get(remoteId);
             
             req.onsuccess = function() {
                 const existing = req.result;
-                const conn = peer.connect(remoteId);
+                const conn = peer.connect(remoteId, { reliable: true });
                 
                 conn.on('open', () => {
-                    // Отправляем приветствие с нашим именем
                     conn.send(JSON.stringify({ type: 'auth_hello', nickname: myNickname }));
+                });
+
+                conn.on('error', (err) => {
+                    addSystemMessage('⚠️ Ошибка соединения с узлом');
                 });
 
                 conn.on('data', (data) => {
@@ -458,7 +476,6 @@
                             addSystemMessage('🛡️ Защищенный сеанс установлен с ' + contactName);
                         } else if (parsed.type === 'crypto_update') {
                             currentCryptoKey = parsed.cryptoKey;
-                            // Обновляем в БД
                             const tx2 = db.transaction('contacts', 'readwrite');
                             const store2 = tx2.objectStore('contacts');
                             store2.get(remoteId).onsuccess = (e) => {
@@ -504,10 +521,12 @@
             });
         }
 
-        // Индивидуальное обновление криптоключа с этим пользователем
         function rotateIndividualCryptoKey() {
             if (!currentConn) return;
-            const newKey = 'sec-' + Math.random().toString(36).substring(2, 10);
+            const array = new Uint8Array(20);
+            window.crypto.getRandomValues(array);
+            const newKey = 'sec-' + Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+            
             currentCryptoKey = newKey;
             currentConn.send(JSON.stringify({ type: 'crypto_update', cryptoKey: newKey }));
             addSystemMessage('🔑 Вы обновили индивидуальный криптоключ для этого чата.');
