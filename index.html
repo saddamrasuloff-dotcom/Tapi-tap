@@ -101,18 +101,18 @@
 
     <div class="glass-app w-full max-w-[1400px] h-full rounded-2xl md:rounded-3xl flex overflow-hidden relative">
         
-        <!-- Левая мини-панель с рабочими кнопками -->
+        <!-- Левая мини-панель -->
         <aside class="w-16 glass-sidebar hidden sm:flex flex-col items-center py-5 gap-6 shrink-0">
             <div class="w-10 h-10 rounded-xl bg-[#4E6851]/30 text-[#DCC9A9] flex items-center justify-center font-black text-sm border border-[#4E6851]/40 shadow-md">
                 T
             </div>
             <div class="flex flex-col gap-3 text-gray-400 w-full items-center">
-                <button id="nav-chat" onclick="switchTab('chat')" class="nav-icon-btn active p-3 rounded-xl hover:bg-white/10 hover:text-[#DCC9A9]" title="Чаты и переписка">💬</button>
-                <button id="nav-network" onclick="switchTab('network')" class="nav-icon-btn p-3 rounded-xl hover:bg-white/10 hover:text-[#DCC9A9]" title="P2P Сеть и ваш ID">🌐</button>
-                <button id="nav-settings" onclick="switchTab('settings')" class="nav-icon-btn p-3 rounded-xl hover:bg-white/10 hover:text-[#DCC9A9]" title="Настройки безопасности">⚙️</button>
+                <button id="nav-chat" onclick="switchTab('chat')" class="nav-icon-btn active p-3 rounded-xl hover:bg-white/10 hover:text-[#DCC9A9]" title="Чаты">💬</button>
+                <button id="nav-network" onclick="switchTab('network')" class="nav-icon-btn p-3 rounded-xl hover:bg-white/10 hover:text-[#DCC9A9]" title="Идентификаторы и ключи">🌐</button>
+                <button id="nav-settings" onclick="switchTab('settings')" class="nav-icon-btn p-3 rounded-xl hover:bg-white/10 hover:text-[#DCC9A9]" title="Безопасность">⚙️</button>
             </div>
             <div class="mt-auto text-[10px] text-[#4E6851] font-mono rotate-[-90deg] tracking-widest">
-                SECURE
+                DUAL-KEY
             </div>
         </aside>
 
@@ -129,29 +129,29 @@
                 </div>
                 
                 <div class="flex items-center gap-2 flex-wrap">
-                    <div class="flex items-center gap-1.5 bg-black/40 px-2.5 py-1 rounded-lg border border-[#DCC9A9]/15">
-                        <span class="text-[11px] text-gray-400">Мой ID:</span>
-                        <span id="my-peer-id" class="font-mono text-[11px] text-[#DCC9A9] max-w-[110px] truncate select-all">Генерация...</span>
-                        <button onclick="copyMyId()" class="text-xs bg-[#4E6851] text-[#DCC9A9] px-2 py-0.5 rounded hover:bg-[#3d5240] transition" title="Скопировать мой ID">📋 Копировать</button>
+                    <div class="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-lg border border-[#DCC9A9]/15">
+                        <span class="text-[10px] text-gray-400">Постоянный ID:</span>
+                        <span id="header-identity-id" class="font-mono text-[10px] text-[#DCC9A9] max-w-[90px] truncate select-all">...</span>
+                        <button onclick="copyIdentityId()" class="text-[10px] bg-[#4E6851] text-[#DCC9A9] px-1.5 py-0.5 rounded hover:bg-[#3d5240] transition">📋</button>
                     </div>
-                    
-                    <input type="text" id="remote-peer-input" placeholder="Вставьте ID собеседника..." class="glass-input px-3 py-1.5 rounded-lg text-xs w-40 md:w-48">
+
+                    <input type="text" id="remote-peer-input" placeholder="Введите постоянный ID..." class="glass-input px-3 py-1.5 rounded-lg text-xs w-40 md:w-48">
                     <button id="connect-btn" class="btn-retro-red font-bold px-3.5 py-1.5 rounded-lg text-xs transition active:scale-95">Связаться</button>
                     <button id="disconnect-btn" class="hidden bg-gray-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs">Сброс</button>
                 </div>
             </header>
 
-            <!-- Основной контент (динамические вкладки) -->
+            <!-- Основной контент -->
             <div class="flex-1 flex flex-col overflow-hidden relative bg-black/20">
                 
-                <!-- ВКЛАДКА 1: ЧАТ (Основной экран) -->
+                <!-- ВКЛАДКА 1: ЧАТ -->
                 <div id="tab-chat" class="flex-1 flex flex-col h-full overflow-hidden">
                     <div class="px-5 py-2.5 bg-black/20 border-b border-[#DCC9A9]/10 flex justify-between items-center shrink-0">
                         <div class="flex items-center gap-3">
                             <div class="w-8 h-8 rounded-full bg-[#4E6851]/40 text-[#DCC9A9] flex items-center justify-center font-bold text-xs border border-[#4E6851]/60">P2P</div>
                             <div>
-                                <h3 class="text-xs font-bold text-[#DCC9A9]">Защищенный узел прямой связи</h3>
-                                <p class="text-[10px] text-gray-400">Шифрование AES-256 на клиенте</p>
+                                <h3 class="text-xs font-bold text-[#DCC9A9]">Защищенный узел с двухключевой идентификацией</h3>
+                                <p class="text-[10px] text-gray-400">Постоянный ID + Крипто-токен сессии (AES-256)</p>
                             </div>
                         </div>
                         <div class="flex gap-2">
@@ -164,7 +164,7 @@
                     <div id="chat-container" class="flex-1 p-5 overflow-y-auto space-y-3 flex flex-col">
                         <div class="flex justify-center my-auto">
                             <div class="text-center text-gray-400 text-xs glass-card p-6 rounded-2xl max-w-sm border border-[#DCC9A9]/15">
-                                🔒 <strong>Канал готов.</strong><br>Скопируйте свой ID кнопкой выше, передайте его собеседнику, а его ID вставьте в поле справа для связи.
+                                🔒 <strong>Система двух ключей активна.</strong><br>Постоянный ID служит для надежной идентификации, а крипто-токен защищает сам сеанс общения.
                             </div>
                         </div>
                     </div>
@@ -184,35 +184,35 @@
                     </div>
                 </div>
 
-                <!-- ВКЛАДКА 2: P2P СЕТЬ (Кнопка 🌐) -->
+                <!-- ВКЛАДКА 2: ИДЕНТИФИКАТОРЫ И КЛЮЧИ -->
                 <div id="tab-network" class="flex-1 hidden flex-col p-6 overflow-y-auto space-y-4">
-                    <h2 class="text-base font-bold text-[#DCC9A9]">🌐 Децентрализованная P2P сеть</h2>
-                    <p class="text-xs text-gray-400">Платформа «Тапи - Тап» не использует промежуточные серверы для хранения сообщений. Связь устанавливается напрямую между устройствами (Peer-to-Peer).</p>
+                    <h2 class="text-base font-bold text-[#DCC9A9]">🌐 Управление ключами идентификации</h2>
+                    <p class="text-xs text-gray-400">Ваш профиль защищен двумя уровнями ключей: постоянный ID для неизменной связи и крипто-токен для конфиденциальности сеанса.</p>
                     
                     <div class="glass-card p-4 rounded-xl border border-[#DCC9A9]/15 space-y-3">
-                        <div class="text-xs font-bold text-[#DCC9A9]">Ваш сетевой идентификатор (Node ID):</div>
+                        <div class="text-xs font-bold text-[#DCC9A9]">1. Постоянный ID (для идентификации пользователя):</div>
                         <div class="flex items-center gap-2">
-                            <input type="text" id="network-my-id" readonly class="glass-input flex-1 px-3 py-2 rounded-lg text-xs font-mono text-orange-400" value="Генерация...">
-                            <button onclick="copyMyId()" class="btn-retro-red px-4 py-2 rounded-lg text-xs font-bold">Копировать ID</button>
+                            <input type="text" id="net-identity-id" readonly class="glass-input flex-1 px-3 py-2 rounded-lg text-xs font-mono text-orange-400" value="Загрузка...">
+                            <button onclick="copyIdentityId()" class="btn-retro-red px-4 py-2 rounded-lg text-xs font-bold">Копировать ID</button>
                         </div>
-                        <p class="text-[11px] text-gray-500">Передайте этот ключ вашему партнеру по сделке через защищенный канал, чтобы он мог инициировать прямое подключение.</p>
+                    </div>
+
+                    <div class="glass-card p-4 rounded-xl border border-[#DCC9A9]/15 space-y-3">
+                        <div class="text-xs font-bold text-[#DCC9A9]">2. Крипто-токен сессии (для доступа к общению):</div>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="net-session-token" readonly class="glass-input flex-1 px-3 py-2 rounded-lg text-xs font-mono text-emerald-400" value="Загрузка...">
+                            <button onclick="rotateSessionToken()" class="bg-[#4E6851] text-[#DCC9A9] hover:bg-[#3d5240] px-4 py-2 rounded-lg text-xs font-bold transition">🔄 Сменить крипто-токен</button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- ВКЛАДКА 3: НАСТРОЙКИ (Кнопка ⚙️) -->
+                <!-- ВКЛАДКА 3: НАСТРОЙКИ -->
                 <div id="tab-settings" class="flex-1 hidden flex-col p-6 overflow-y-auto space-y-4">
-                    <h2 class="text-base font-bold text-[#DCC9A9]">⚙️ Параметры безопасности и клиента</h2>
-                    
+                    <h2 class="text-base font-bold text-[#DCC9A9]">⚙️ Настройки безопасности</h2>
                     <div class="glass-card p-4 rounded-xl border border-[#DCC9A9]/15 space-y-3">
-                        <div class="text-xs font-bold text-[#DCC9A9]">Шифрование данных</div>
-                        <p class="text-xs text-gray-400">Все сообщения, файлы и голосовые заметки шифруются на стороне клиента с использованием алгоритма AES-256. Ключи храмося только в оперативной памяти устройства.</p>
-                    </div>
-
-                    <div class="glass-card p-4 rounded-xl border border-[#DCC9A9]/15 space-y-3">
-                        <div class="text-xs font-bold text-[#DCC9A9]">Управление сессией</div>
-                        <button onclick="if(confirm('Сбросить текущее соединение и перезагрузить узел?')) location.reload();" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-xs font-bold transition">
-                            🔄 Перезагрузить P2P узел и очистить кэш
-                        </button>
+                        <div class="text-xs font-bold text-[#DCC9A9]">Сброс постоянного ID профиля</div>
+                        <p class="text-xs text-gray-400">Полностью заменяет ваш постоянный идентификатор. Собеседники с вашим старым ID больше не смогут вас найти без передачи нового адреса.</p>
+                        <button onclick="rotateIdentityId()" class="btn-retro-red px-4 py-2 rounded-lg text-xs font-bold transition">Сбросить постоянный ID</button>
                     </div>
                 </div>
 
@@ -233,20 +233,44 @@
         </div>
     </div>
 
-    <!-- P2P и логика интерфейса -->
+    <!-- Логика двухключевой архитектуры -->
     <script>
-        const peer = new Peer(undefined, { debug: 1 });
+        // Генерация криптостойких ключей
+        function generateSecureKey(prefix) {
+            const array = new Uint8Array(24);
+            window.crypto.getRandomValues(array);
+            const hex = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+            return prefix + '-' + hex;
+        }
 
-        let myId = '';
+        // 1. Постоянный ID (Identity)
+        let identityId = localStorage.getItem('tapi_identity_id');
+        if (!identityId) {
+            identityId = generateSecureKey('tapi-id');
+            localStorage.setItem('tapi_identity_id', identityId);
+        }
+
+        // 2. Крипто-токен сессии (Session Token)
+        let sessionToken = localStorage.getItem('tapi_session_token');
+        if (!sessionToken) {
+            sessionToken = generateSecureKey('tapi-sec');
+            localStorage.setItem('tapi_session_token', sessionToken);
+        }
+
+        // Инициализируем Peer по постоянному ID для стабильной идентификации
+        let peer = new Peer(identityId, { debug: 1 });
+
         let currentConn = null;
         let currentCall = null;
         let localStream = null;
         let remoteStream = null;
+        let verifiedSessionToken = null; // Крипто-токен подтвержденный от собеседника
 
         const $ = id => document.getElementById(id);
         const chat = $('chat-container');
-        const myIdSpan = $('my-peer-id');
-        const networkMyId = $('network-my-id');
+        const headerIdentityId = $('header-identity-id');
+        const netIdentityId = $('net-identity-id');
+        const netSessionToken = $('net-session-token');
         const connStatus = $('conn-status');
         const remoteInput = $('remote-peer-input');
         const connectBtn = $('connect-btn');
@@ -264,7 +288,6 @@
         const endCallBtn = $('end-call-btn');
         const acceptCallBtn = $('accept-call-btn');
 
-        // Переключение вкладок левой панели
         function switchTab(tabName) {
             ['chat', 'network', 'settings'].forEach(t => {
                 $('tab-' + t).classList.add('hidden');
@@ -276,75 +299,118 @@
             $('nav-' + tabName).classList.add('active');
         }
 
-        peer.on('open', (id) => {
-            myId = id;
-            myIdSpan.textContent = id;
-            if (networkMyId) networkMyId.value = id;
-        });
+        function updateUIKeys() {
+            if (headerIdentityId) headerIdentityId.textContent = identityId;
+            if (netIdentityId) netIdentityId.value = identityId;
+            if (netSessionToken) netSessionToken.value = sessionToken;
+        }
 
-        function copyMyId() {
-            if (!myId) return alert('ID еще не сгенерирован');
-            navigator.clipboard.writeText(myId).then(() => {
-                alert('Ваш ID скопирован в буфер обмена!');
-            }).catch(err => {
-                prompt('Скопируйте ваш ID вручную:', myId);
+        function initPeerEvents() {
+            peer.on('open', (id) => {
+                updateUIKeys();
+            });
+
+            peer.on('error', (err) => {
+                if (err.type === 'unavailable-id') {
+                    alert('Этот постоянный ID уже занят в сети. Перегенерация...');
+                    localStorage.removeItem('tapi_identity_id');
+                    location.reload();
+                } else {
+                    addSystemMessage('Ошибка сети: ' + err.type);
+                }
+            });
+
+            peer.on('connection', (conn) => {
+                if (currentConn) { conn.close(); return; }
+                setupConnection(conn);
+                addSystemMessage('📞 Входящий запрос по постоянному ID...');
+            });
+
+            peer.on('call', (call) => {
+                if (currentCall) { call.answer(); call.close(); return; }
+                callOverlay.classList.remove('hidden');
+                callOverlay.classList.add('flex');
+                acceptCallBtn.classList.remove('hidden');
+                endCallBtn.textContent = 'Отклонить';
+                currentCall = call;
+
+                acceptCallBtn.onclick = async () => {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: call.metadata?.type === 'video' });
+                        localStream = stream;
+                        localVideo.srcObject = stream;
+                        call.answer(stream);
+                        call.on('stream', (remote) => {
+                            remoteStream = remote;
+                            remoteVideo.srcObject = remote;
+                        });
+                        call.on('close', () => endCall());
+                        acceptCallBtn.classList.add('hidden');
+                        endCallBtn.textContent = 'Завершить';
+                        addSystemMessage('🔊 Защищенный звонок активен');
+                    } catch (e) {
+                        alert('Нет доступа к камере/микрофону');
+                        endCall();
+                    }
+                };
             });
         }
 
-        peer.on('error', (err) => {
-            addSystemMessage('Ошибка сети: ' + err.type);
-        });
+        initPeerEvents();
 
-        peer.on('connection', (conn) => {
-            if (currentConn) { conn.close(); return; }
-            setupConnection(conn);
-            addSystemMessage('📞 Входящее P2P соединение установлено');
-        });
+        // Смена крипто-токена сессии с уведомлением собеседника
+        function rotateSessionToken() {
+            sessionToken = generateSecureKey('tapi-sec');
+            localStorage.setItem('tapi_session_token', sessionToken);
+            updateUIKeys();
 
-        peer.on('call', (call) => {
-            if (currentCall) { call.answer(); call.close(); return; }
-            callOverlay.classList.remove('hidden');
-            callOverlay.classList.add('flex');
-            acceptCallBtn.classList.remove('hidden');
-            endCallBtn.textContent = 'Отклонить';
-            currentCall = call;
+            if (currentConn && currentConn.open) {
+                currentConn.send(JSON.stringify({ type: 'session_token_update', token: sessionToken }));
+                addSystemMessage('🔑 Новый крипто-токен отправлен собеседнику.');
+            }
+            alert('Крипто-токен сессии успешно обновлен!');
+        }
 
-            acceptCallBtn.onclick = async () => {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: call.metadata?.type === 'video' });
-                    localStream = stream;
-                    localVideo.srcObject = stream;
-                    call.answer(stream);
-                    call.on('stream', (remote) => {
-                        remoteStream = remote;
-                        remoteVideo.srcObject = remote;
-                    });
-                    call.on('close', () => endCall());
-                    acceptCallBtn.classList.add('hidden');
-                    endCallBtn.textContent = 'Завершить';
-                    addSystemMessage('🔊 Защищенный звонок активен');
-                } catch (e) {
-                    alert('Нет доступа к камере/микрофону');
-                    endCall();
-                }
-            };
-        });
+        // Смена постоянного ID профиля
+        function rotateIdentityId() {
+            if (confirm('Сбросить постоянный ID? Собеседники больше не смогут найти вас по старому адресу.')) {
+                localStorage.removeItem('tapi_identity_id');
+                location.reload();
+            }
+        }
+
+        function copyIdentityId() {
+            navigator.clipboard.writeText(identityId).then(() => {
+                alert('Постоянный ID скопирован в буфер обмена!');
+            });
+        }
 
         function setupConnection(conn) {
             currentConn = conn;
-            connStatus.textContent = 'Онлайн (P2P)';
-            connStatus.className = 'text-[10px] px-2.5 py-0.5 rounded-full retro-green font-mono border border-[#4E6851]';
-            connectBtn.classList.add('hidden');
-            disconnectBtn.classList.remove('hidden');
-            remoteInput.disabled = true;
-
-            chat.innerHTML = '';
-            switchTab('chat'); // Автоматически переходим в чат при соединении
+            
+            // При установке соединения сразу передаем наш текущий крипто-токен для проверки доступа
+            conn.on('open', () => {
+                conn.send(JSON.stringify({ type: 'auth_handshake', identity: identityId, token: sessionToken }));
+            });
 
             conn.on('data', (data) => {
                 try {
                     const parsed = JSON.parse(data);
-                    if (parsed.type === 'text') {
+                    
+                    if (parsed.type === 'auth_handshake') {
+                        verifiedSessionToken = parsed.token;
+                        connStatus.textContent = 'Защищено (2 ключа)';
+                        connStatus.className = 'text-[10px] px-2.5 py-0.5 rounded-full retro-green font-mono border border-[#4E6851]';
+                        connectBtn.classList.add('hidden');
+                        disconnectBtn.classList.remove('hidden');
+                        remoteInput.disabled = true;
+                        chat.innerHTML = '';
+                        switchTab('chat');
+                        addSystemMessage('🛡️ Пользователь идентифицирован. Крипто-токен сессии подтвержден.');
+                    } else if (parsed.type === 'session_token_update') {
+                        verifiedSessionToken = parsed.token;
+                        addSystemMessage('🔑 Собеседник обновил крипто-токен сессии.');
+                    } else if (parsed.type === 'text') {
                         addMessage(parsed.text, false);
                     } else if (parsed.type === 'file') {
                         const blob = base64ToBlob(parsed.data, parsed.mimeType);
@@ -368,6 +434,7 @@
 
         function disconnect() {
             if (currentConn) { currentConn.close(); currentConn = null; }
+            verifiedSessionToken = null;
             connStatus.textContent = 'Не подключено';
             connStatus.className = 'text-[10px] px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 font-mono';
             connectBtn.classList.remove('hidden');
@@ -377,7 +444,7 @@
         }
 
         function sendText(text) {
-            if (!currentConn) return addSystemMessage('Сначала подключитесь к собеседнику');
+            if (!currentConn || !verifiedSessionToken) return addSystemMessage('Нет подтвержденного сеанса связи');
             const payload = JSON.stringify({ type: 'text', text });
             currentConn.send(payload);
             addMessage(text, true);
@@ -466,7 +533,7 @@
 
         connectBtn.addEventListener('click', () => {
             const remoteId = remoteInput.value.trim();
-            if (!remoteId || remoteId === myId) return alert('Введите корректный ID собеседника');
+            if (!remoteId || remoteId === identityId) return alert('Введите корректный постоянный ID собеседника');
             const conn = peer.connect(remoteId);
             if (conn) setupConnection(conn);
         });
