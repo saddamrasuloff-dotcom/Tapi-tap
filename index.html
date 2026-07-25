@@ -422,14 +422,17 @@
             const peerId = state.activeContactId;
             const conn = peerId ? state.connections.get(peerId) : null;
             const open = !!(conn && conn.open);
+            const authorized = !!(peerId && state.auth.get(peerId)?.authorized);
 
-            sendBtn.disabled = !open;
-            msgInput.disabled = !open;
+            sendBtn.disabled = !authorized;
+            msgInput.disabled = !authorized;
             disconnectBtn.classList.toggle('hidden', !conn);
-            rotateCryptoBtn.classList.toggle('hidden', !open);
+            rotateCryptoBtn.classList.toggle('hidden', !authorized);
 
-            if (open) {
-                setChatStatus('online', 'P2P соединение установлено');
+            if (authorized) {
+                setChatStatus('online', 'P2P + авторизация установлены');
+            } else if (open) {
+                setChatStatus('connecting', 'P2P открыто — ожидание авторизации');
             }
         }
 
@@ -527,6 +530,10 @@
 
             // peerId -> DataConnection
             connections: new Map(),
+
+            // peerId -> authorization state:
+            // { helloSent, helloReceived, accepted, confirmed, authorized, nickname, timer }
+            auth: new Map(),
 
             // peerId -> {timer, attempts}
             reconnect: new Map(),
@@ -668,7 +675,11 @@
         async function openChat(peerId) {
             const contact = await getContact(peerId);
             if (!contact) {
-                toast('Контакт не найден', 'error');
+                state.activeContactId = peerId;
+                currentChatName.textContent = peerId;
+                setChatStatus('connecting', 'Новый контакт — подключение...');
+                await renderMessages(peerId);
+                connectToPeer(peerId);
                 return;
             }
 
@@ -845,7 +856,9 @@
             peer.on('close', () => {
                 console.warn('[PeerJS] CLOSE');
                 state.peerReady = false;
+                for (const peerId of state.auth.keys()) resetAuth(peerId);
                 setPeerStatus('offline','Peer закрыт');
+                updateButtons();
             });
         }
 
@@ -873,9 +886,275 @@
         }
 
         // ------------------------------------------------------------
-        // DataConnection
+        // DataConnection + двусторонний AUTH handshake
         // ------------------------------------------------------------
+        function getAuth(peerId) {
+            if (!state.auth.has(peerId)) {
+                state.auth.set(peerId, {
+                    helloSent: false,
+                    helloReceived: false,
+                    accepted: false,
+                    confirmed: false,
+                    authorized: false,
+                    nickname: peerId,
+                    timer: null
+                });
+            }
+            return state.auth.get(peerId);
+        }
+
+        function resetAuth(peerId) {
+            const a = state.auth.get(peerId);
+            if (a?.timer) clearTimeout(a.timer);
+            state.auth.delete(peerId);
+        }
+
+        function setAuthorized(peerId, value) {
+            const a = getAuth(peerId);
+            a.authorized = !!value;
+
+            if (state.activeContactId === peerId) {
+                if (value) {
+                    setChatStatus('online', 'P2P + авторизация установлены');
+                } else {
+                    setChatStatus('offline', 'Ожидание авторизации');
+                }
+            }
+
+            updateButtons();
+            renderContacts();
+        }
+
+        function startAuthTimeout(peerId, conn) {
+            const a = getAuth(peerId);
+
+            if (a.timer) clearTimeout(a.timer);
+
+            a.timer = setTimeout(() => {
+                if (!a.authorized && conn && !conn.open) return;
+
+                if (!a.authorized) {
+                    console.warn('[AUTH] Timeout:', peerId, a);
+                    if (state.activeContactId === peerId) {
+                        setChatStatus('error', 'Таймаут авторизации');
+                    }
+                    toast('Собеседник не подтвердил соединение вовремя.', 'error');
+
+                    try { conn?.close(); } catch {}
+                    scheduleReconnect(peerId);
+                }
+            }, 15000);
+        }
+
+        function completeAuthorization(peerId) {
+            const a = getAuth(peerId);
+            a.authorized = true;
+
+            if (a.timer) {
+                clearTimeout(a.timer);
+                a.timer = null;
+            }
+
+            console.info('[AUTH] AUTHORIZED:', peerId);
+            setAuthorized(peerId, true);
+        }
+
+        function sendAuthHello(peerId, conn) {
+            if (!conn?.open) return false;
+
+            const a = getAuth(peerId);
+            if (a.helloSent) return true;
+
+            const ok = safeSend(conn, {
+                type: 'auth_hello',
+                protocol: 2,
+                nickname: state.myNickname,
+                from: state.myId,
+                timestamp: now()
+            });
+
+            if (ok) {
+                a.helloSent = true;
+                startAuthTimeout(peerId, conn);
+                if (state.activeContactId === peerId) {
+                    setChatStatus('connecting', 'Ожидание подтверждения контакта...');
+                }
+            }
+
+            return ok;
+        }
+
         function registerConnection(conn, incoming=false) {
+            const peerId = conn.peer;
+
+            const old = state.connections.get(peerId);
+            if (old && old !== conn) {
+                try { old.close(); } catch {}
+            }
+
+            resetAuth(peerId);
+            state.connections.set(peerId, conn);
+            getAuth(peerId);
+
+            if (state.activeContactId === peerId) {
+                setChatStatus('connecting',
+                    incoming ? 'Входящее соединение...' : 'P2P соединение открыто...');
+            }
+
+            conn.on('open', async () => {
+                console.info('[P2P] DATA OPEN:', peerId, 'incoming=', incoming);
+
+                getAuth(peerId);
+
+                if (state.activeContactId === peerId) {
+                    setChatStatus('connecting', 'P2P открыт. Авторизация...');
+                }
+
+                updateButtons();
+                renderContacts();
+
+                // Оба конца отправляют hello. Это устраняет зависимость
+                // от того, кто был инициатором DataConnection.
+                sendAuthHello(peerId, conn);
+            });
+
+            conn.on('data', data => handleData(peerId, data));
+
+            conn.on('error', err => {
+                console.error('[P2P] DATA ERROR:', peerId, err);
+                resetAuth(peerId);
+
+                if (state.activeContactId === peerId) {
+                    setChatStatus('error', 'Ошибка P2P соединения');
+                    updateButtons();
+                }
+
+                scheduleReconnect(peerId);
+            });
+
+            conn.on('close', () => {
+                console.warn('[P2P] DATA CLOSE:', peerId);
+
+                resetAuth(peerId);
+                state.connections.delete(peerId);
+
+                if (state.activeContactId === peerId) {
+                    setChatStatus('offline', 'Соединение закрыто');
+                    updateButtons();
+                }
+
+                renderContacts();
+                scheduleReconnect(peerId);
+            });
+
+            if (incoming) {
+                setChatStatus('connecting', 'Входящее соединение...');
+            }
+        }
+
+        function safeSend(conn, payload) {
+            if (!conn || !conn.open) return false;
+            try {
+                conn.send(JSON.stringify(payload));
+                return true;
+            } catch (e) {
+                console.error('[P2P] SEND ERROR:', e);
+                return false;
+            }
+        }
+
+        function connectToPeer(peerId) {
+            if (!peerId) return;
+
+            if (!state.peer || !state.peerReady || state.peer.destroyed) {
+                setChatStatus('connecting','Ожидание регистрации P2P...');
+                toast('P2P ещё не готов. Повторим подключение...', 'info');
+                schedulePeerReconnect();
+                return;
+            }
+
+            if (peerId === state.myId) {
+                toast('Нельзя подключиться к собственному ID', 'error');
+                return;
+            }
+
+            const existing = state.connections.get(peerId);
+
+            if (existing?.open) {
+                const a = getAuth(peerId);
+
+                if (a.authorized) {
+                    setChatStatus('online', 'P2P + авторизация установлены');
+                } else {
+                    setChatStatus('connecting', 'Ожидание авторизации...');
+                    sendAuthHello(peerId, existing);
+                }
+
+                updateButtons();
+                return;
+            }
+
+            if (existing) {
+                try { existing.close(); } catch {}
+                state.connections.delete(peerId);
+            }
+
+            resetAuth(peerId);
+            state.activeContactId = peerId;
+            setChatStatus('connecting','Устанавливаем P2P...');
+            updateButtons();
+
+            console.info('[P2P] CONNECT →', peerId);
+
+            let conn;
+            try {
+                conn = state.peer.connect(peerId, {
+                    reliable: true,
+                    serialization: 'json'
+                });
+            } catch (e) {
+                console.error('[P2P] CONNECT EXCEPTION:', e);
+                setChatStatus('error','Ошибка создания соединения');
+                scheduleReconnect(peerId);
+                return;
+            }
+
+            registerConnection(conn, false);
+
+            const timeout = setTimeout(() => {
+                if (!conn.open) {
+                    console.warn('[P2P] Connection timeout:', peerId);
+                    setChatStatus('error','Таймаут P2P соединения');
+                    try { conn.close(); } catch {}
+                    scheduleReconnect(peerId);
+                }
+            }, 20000);
+
+            conn.once('open', () => clearTimeout(timeout));
+        }
+
+        function scheduleReconnect(peerId) {
+            if (!peerId) return;
+
+            let item = state.reconnect.get(peerId);
+            if (item?.timer) return;
+
+            const attempts = Math.min((item?.attempts || 0) + 1, 8);
+            const delay = Math.min(30000, 2000 * Math.pow(1.5, attempts - 1));
+
+            const timer = setTimeout(() => {
+                state.reconnect.delete(peerId);
+
+                if (state.activeContactId === peerId &&
+                    state.peerReady &&
+                    !state.connections.get(peerId)?.open) {
+                    connectToPeer(peerId);
+                }
+            }, delay);
+
+            state.reconnect.set(peerId, { timer, attempts });
+            console.info(`[P2P] Reconnect ${peerId} in ${Math.round(delay/1000)}s`);
+        }
             const peerId = conn.peer;
 
             const old = state.connections.get(peerId);
@@ -1062,20 +1341,39 @@
                 return;
             }
 
+            if (msg.type === 'auth_confirm') {
+                handleAuthConfirm(peerId, msg);
+                return;
+            }
+
             if (msg.type === 'auth_reject') {
+                const a = getAuth(peerId);
+                a.accepted = false;
+
+                if (state.activeContactId === peerId) {
+                    setChatStatus('error', 'Собеседник отклонил подключение');
+                }
+
                 toast('Собеседник отклонил запрос', 'info');
                 return;
             }
 
+            // Запрещаем обычные сообщения до завершения двустороннего handshake.
             if (msg.type === 'text') {
+                const a = getAuth(peerId);
+
+                if (!a.authorized) {
+                    console.warn('[AUTH] Text rejected before authorization:', peerId);
+                    return;
+                }
+
                 if (typeof msg.text !== 'string') return;
                 addMessage(peerId, msg.text, false);
                 return;
             }
 
-            // E2EE intentionally not implemented.
             if (msg.type === 'crypto_update') {
-                toast('Смена криптоключа отключена: E2EE пока не реализовано.', 'info');
+                toast('E2EE ещё не реализовано. Криптоключ не изменён.', 'info');
                 return;
             }
 
@@ -1083,16 +1381,22 @@
         }
 
         async function handleAuthHello(peerId, msg) {
+            const a = getAuth(peerId);
+            a.helloReceived = true;
+            a.nickname = msg.nickname || peerId;
+
             const contact = await getContact(peerId);
 
-            // Existing contacts are trusted at the application level.
-            // This is NOT cryptographic identity verification.
+            // Если контакт уже известен, подтверждаем автоматически.
             if (contact) {
+                a.accepted = true;
+
                 const conn = state.connections.get(peerId);
+
                 if (conn?.open) {
                     safeSend(conn, {
                         type: 'auth_accept',
-                        protocol: 1,
+                        protocol: 2,
                         nickname: state.myNickname,
                         accepted: true,
                         timestamp: now()
@@ -1100,75 +1404,145 @@
                 }
 
                 if (state.activeContactId === peerId) {
-                    setChatStatus('online','Контакт подтверждён');
+                    setChatStatus('connecting', 'Контакт известен. Подтверждаем...');
                 }
+
                 return;
             }
 
+            // Новый контакт: показываем окно только после реального
+            // открытия DataConnection.
             state.pendingConnection = {
                 peerId,
-                nickname: msg.nickname || peerId
+                nickname: a.nickname
             };
 
-            incomingUsername.textContent = state.pendingConnection.nickname;
-            customContactName.value = state.pendingConnection.nickname;
+            incomingUsername.textContent = a.nickname;
+            customContactName.value = a.nickname;
 
             incomingModal.classList.remove('hidden');
             incomingModal.classList.add('flex');
+
+            setChatStatus('connecting', 'Ожидание подтверждения пользователя...');
         }
 
-        function handleAuthAccept(peerId) {
-            const conn = state.connections.get(peerId);
-            if (!conn?.open) return;
+        function handleAuthAccept(peerId, msg) {
+            const a = getAuth(peerId);
 
-            if (state.activeContactId === peerId) {
-                setChatStatus('online','Контакт подтверждён');
+            if (!msg.accepted) {
+                a.accepted = false;
+                setChatStatus('error', 'Авторизация отклонена');
+                return;
             }
 
-            toast('Собеседник подтвердил соединение', 'success');
-            updateButtons();
+            a.accepted = true;
+
+            const conn = state.connections.get(peerId);
+
+            if (!conn?.open) {
+                console.warn('[AUTH] accept received but connection is closed');
+                return;
+            }
+
+            // Инициатор получил разрешение. Отправляем финальное подтверждение.
+            safeSend(conn, {
+                type: 'auth_confirm',
+                protocol: 2,
+                from: state.myId,
+                timestamp: now()
+            });
+
+            // Для уже сохранённого контакта можно завершить handshake сразу.
+            const contactPromise = getContact(peerId);
+            contactPromise.then(contact => {
+                if (contact) {
+                    completeAuthorization(peerId);
+                    toast('Соединение авторизовано', 'success');
+                } else if (state.activeContactId === peerId) {
+                    setChatStatus('connecting', 'Ожидание финального подтверждения...');
+                }
+            });
+        }
+
+        function handleAuthConfirm(peerId) {
+            const a = getAuth(peerId);
+            a.confirmed = true;
+
+            const conn = state.connections.get(peerId);
+
+            if (!conn?.open) {
+                console.warn('[AUTH] confirm received but connection is closed');
+                return;
+            }
+
+            // Если мы сами разрешили контакт — handshake завершён.
+            if (a.accepted) {
+                completeAuthorization(peerId);
+                toast('P2P-соединение полностью авторизовано', 'success');
+            } else {
+                console.warn('[AUTH] confirm received before local accept:', peerId);
+            }
         }
 
         window.acceptIncoming = async function() {
             const pending = state.pendingConnection;
             if (!pending) return;
 
+            const peerId = pending.peerId;
             const name =
                 customContactName.value.trim() ||
                 pending.nickname ||
-                pending.peerId;
+                peerId;
+
+            const conn = state.connections.get(peerId);
+
+            if (!conn?.open) {
+                toast('Соединение уже потеряно. Запрос нужно повторить.', 'error');
+                state.pendingConnection = null;
+                incomingModal.classList.add('hidden');
+                incomingModal.classList.remove('flex');
+                scheduleReconnect(peerId);
+                return;
+            }
 
             await saveContact({
-                id: pending.peerId,
+                id: peerId,
                 name,
                 createdAt: now()
             });
 
-            const conn = state.connections.get(pending.peerId);
+            const a = getAuth(peerId);
+            a.accepted = true;
 
-            if (conn?.open) {
-                safeSend(conn, {
-                    type: 'auth_accept',
-                    protocol: 1,
-                    nickname: state.myNickname,
-                    accepted: true,
-                    timestamp: now()
-                });
+            safeSend(conn, {
+                type: 'auth_accept',
+                protocol: 2,
+                nickname: state.myNickname,
+                accepted: true,
+                timestamp: now()
+            });
 
-                state.activeContactId = pending.peerId;
-                currentChatName.textContent = name;
-                setChatStatus('online','Контакт подтверждён');
-                await renderContacts();
-                await renderMessages(pending.peerId);
-                updateButtons();
-                toast('Контакт добавлен', 'success');
-            } else {
-                toast('Соединение потеряно до подтверждения', 'error');
-            }
+            state.activeContactId = peerId;
+            currentChatName.textContent = name;
+
+            setChatStatus('connecting', 'Разрешение отправлено. Завершаем авторизацию...');
+
+            await renderContacts();
+            await renderMessages(peerId);
+            updateButtons();
 
             state.pendingConnection = null;
             incomingModal.classList.add('hidden');
             incomingModal.classList.remove('flex');
+
+            // Если подтверждение от второй стороны уже пришло раньше,
+            // завершаем handshake немедленно.
+            if (a.confirmed) {
+                completeAuthorization(peerId);
+                toast('Контакт добавлен и авторизован', 'success');
+            } else {
+                toast('Контакт сохранён. Ожидание подтверждения...', 'success');
+            }
         };
 
         window.rejectIncoming = function() {
@@ -1177,9 +1551,11 @@
                 const conn = state.connections.get(pending.peerId);
                 safeSend(conn, {
                     type: 'auth_reject',
-                    protocol: 1
+                    protocol: 2
                 });
+
                 try { conn?.close(); } catch {}
+                resetAuth(pending.peerId);
             }
 
             state.pendingConnection = null;
@@ -1198,10 +1574,16 @@
             if (!text || !peerId) return;
 
             const conn = state.connections.get(peerId);
+            const authorized = !!state.auth.get(peerId)?.authorized;
 
             if (!conn?.open) {
                 toast('Соединение отсутствует. Пытаемся подключиться...', 'info');
                 connectToPeer(peerId);
+                return;
+            }
+
+            if (!authorized) {
+                toast('Соединение ещё не авторизовано.', 'info');
                 return;
             }
 
@@ -1451,18 +1833,18 @@
                 return;
             }
 
-            let contact = await getContact(id);
+            const contact = await getContact(id);
 
-            if (!contact) {
-                contact = {
-                    id,
-                    name: id,
-                    createdAt: now()
-                };
-                await saveContact(contact);
+            if (contact) {
+                await openChat(id);
+            } else {
+                state.activeContactId = id;
+                currentChatName.textContent = id;
+                setChatStatus('connecting', 'Подключаемся. Ожидаем подтверждение...');
+                await renderMessages(id);
+                connectToPeer(id);
             }
 
-            await openChat(id);
             remoteInput.value = '';
         });
 
