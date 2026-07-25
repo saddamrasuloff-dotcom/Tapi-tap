@@ -3,66 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Тапи - Тап P2P — Защищенный мессенджер</title>
-    <!-- PeerJS (сигнальный сервер для P2P) -->
+    <title>Тапи - Тап P2P Мессенджер</title>
+    <!-- PeerJS для P2P связи -->
     <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .glass-panel {
-            background: rgba(30, 30, 35, 0.85);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        * { box-sizing: border-box; }
+        body {
+            background-color: #0c0d10;
+            color: #DCC9A9;
+            font-family: system-ui, -apple-system, sans-serif;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            margin: 0;
+            background-image: linear-gradient(rgba(12, 13, 16, 0.8), rgba(12, 13, 16, 0.9)), url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2000&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+        }
+        .glass-app {
+            background: rgba(22, 23, 28, 0.8);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(220, 201, 169, 0.12);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.7);
         }
         .glass-sidebar {
-            background: rgba(15, 15, 18, 0.9);
-            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(15, 16, 20, 0.7);
+            border-right: 1px solid rgba(220, 201, 169, 0.08);
+        }
+        .glass-card {
+            background: rgba(220, 201, 169, 0.03);
+            border: 1px solid rgba(220, 201, 169, 0.08);
         }
         .glass-input {
             background: rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
+            border: 1px solid rgba(220, 201, 169, 0.15);
+            color: #DCC9A9;
         }
         .glass-input:focus {
             outline: none;
-            border-color: #F97316;
+            border-color: #DCC9A9;
+            background: rgba(0, 0, 0, 0.6);
         }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+        /* Кнопки и акценты в стиле #B83A2D */
+        .btn-retro-red {
+            background-color: #B83A2D;
+            color: #fff;
+            transition: all 0.2s ease;
         }
-        .blob-blue { background-color: #4285F4; }
-        .blob-orange { background-color: #F97316; }
-        .nav-btn {
-            background: rgba(249, 115, 22, 0.9);
-            color: #000;
-            border: 1px solid rgba(0,0,0,0.5);
-            transition: all 0.2s;
+        .btn-retro-red:hover {
+            background-color: #9d3126;
         }
-        .nav-btn:hover {
-            background: rgba(249, 115, 22, 1);
-            transform: translateY(-1px);
+        /* Индикаторы в стиле #4E6851 */
+        .retro-green {
+            background-color: #4E6851;
+            color: #DCC9A9;
         }
         .message {
             max-width: 80%;
             padding: 10px 14px;
-            border-radius: 18px;
+            border-radius: 14px;
             font-size: 13px;
             line-height: 1.4;
             word-wrap: break-word;
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(220, 201, 169, 0.06);
+            border: 1px solid rgba(220, 201, 169, 0.08);
             align-self: flex-start;
-            border-bottom-left-radius: 6px;
+            color: #DCC9A9;
         }
         .message.self {
             align-self: flex-end;
-            background: #F97316;
-            color: #000;
-            border-bottom-right-radius: 6px;
+            background: #B83A2D;
+            color: #fff;
+            border: none;
         }
         .microphone-btn.recording {
-            color: #ef4444;
+            color: #B83A2D;
             animation: pulse 1.5s infinite;
         }
         @keyframes pulse {
@@ -72,135 +90,106 @@
         }
     </style>
 </head>
-<body class="bg-[#0a0a0c] text-gray-200 font-sans h-screen overflow-hidden relative selection:bg-orange-500 selection:text-white flex flex-col">
+<body class="p-2 md:p-6 items-center justify-center">
 
-    <!-- Фоновые градиенты (дизайн-концепция) -->
-    <div class="fixed top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full blob-blue mix-blend-screen filter blur-[120px] opacity-20"></div>
-    <div class="fixed bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full blob-orange mix-blend-screen filter blur-[140px] opacity-15"></div>
-
-    <!-- Шапка платформы с 7 фирменными кнопками -->
-    <header class="border-b border-white/10 px-6 py-3 flex flex-col xl:flex-row justify-between items-center gap-4 bg-black/50 backdrop-blur-md z-50 shrink-0">
-        <div class="text-white text-2xl font-black tracking-tighter cursor-pointer flex items-center gap-3" onclick="location.reload()">
-            Тапи - <span class="text-orange-500">Тап</span>
-            <span class="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono">🔒 P2P E2EE</span>
-        </div>
-        <nav class="flex flex-wrap justify-center gap-2">
-            <button class="nav-btn font-bold rounded-lg px-3 py-1.5 text-xs">купить</button>
-            <button class="nav-btn font-bold rounded-lg px-3 py-1.5 text-xs">продать</button>
-            <button class="nav-btn font-bold rounded-lg px-3 py-1.5 text-xs">сотрудничество</button>
-            <button class="nav-btn font-bold rounded-lg px-3 py-1.5 text-xs">обратиться к команде</button>
-            <button class="nav-btn font-bold rounded-lg px-3 py-1.5 text-xs">поддержать команду</button>
-            <button class="bg-white text-black font-bold rounded-lg px-3 py-1.5 text-xs flex items-center gap-1.5 border border-black shadow">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
-                Tapi - Tap
-            </button>
-            <button class="nav-btn font-bold rounded-lg px-3 py-1.5 text-xs">страхование</button>
-        </nav>
-    </header>
-
-    <!-- Панель статуса соединения и подключения к Peer ID -->
-    <div class="bg-black/60 border-b border-white/10 px-6 py-2.5 flex flex-wrap items-center justify-between gap-4 z-40 text-xs">
-        <div class="flex items-center gap-3">
-            <span class="text-gray-400">Ваш Peer ID:</span>
-            <span id="my-peer-id" class="font-mono text-orange-400 bg-black/40 px-3 py-1 rounded-md border border-white/10 select-all">Генерация...</span>
-            <span id="conn-status" class="px-2.5 py-1 rounded-md bg-red-500/20 text-red-400 border border-red-500/30">⛔ Не подключено</span>
-        </div>
-        <div class="flex items-center gap-2">
-            <input type="text" id="remote-peer-input" placeholder="Введите ID собеседника..." class="glass-input px-3 py-1.5 rounded-lg text-xs w-48 md:w-64">
-            <button id="connect-btn" class="bg-orange-500 text-black font-bold px-4 py-1.5 rounded-lg hover:bg-orange-400 transition">Подключиться</button>
-            <button id="disconnect-btn" class="hidden bg-gray-700 text-white font-bold px-4 py-1.5 rounded-lg hover:bg-gray-600 transition">Отключить</button>
-        </div>
-    </div>
-
-    <!-- Основное окно мессенджера -->
-    <main class="flex-1 flex w-full max-w-[1700px] mx-auto relative z-10 p-3 md:p-5 gap-3 h-[calc(100vh-130px)] overflow-hidden">
+    <div class="glass-app w-full max-w-[1400px] h-full rounded-2xl md:rounded-3xl flex overflow-hidden relative">
         
-        <div class="glass-panel w-full rounded-2xl flex overflow-hidden shadow-2xl h-full relative">
-            
-            <!-- Левая панель: Чаты -->
-            <div class="glass-sidebar w-80 hidden md:flex flex-col shrink-0">
-                <div class="p-4 border-b border-white/5">
-                    <input type="text" placeholder="Поиск по сделкам..." class="glass-input w-full rounded-lg px-3 py-2 text-xs">
-                </div>
-                <div class="flex-1 overflow-y-auto divide-y divide-white/5">
-                    <div class="p-4 bg-white/5 cursor-pointer border-l-2 border-orange-500">
-                        <div class="flex justify-between items-start mb-1">
-                            <span class="text-xs font-bold text-white">Активная сессия P2P</span>
-                            <span class="text-[10px] text-emerald-400 font-mono">Secure</span>
-                        </div>
-                        <p class="text-xs text-gray-400 truncate">Шифрование ключом устройства</p>
-                    </div>
-                </div>
+        <!-- Левая мини-панель -->
+        <aside class="w-16 glass-sidebar hidden sm:flex flex-col items-center py-5 gap-6 shrink-0">
+            <div class="w-10 h-10 rounded-xl bg-[#4E6851]/30 text-[#DCC9A9] flex items-center justify-center font-black text-sm border border-[#4E6851]/40">
+                T
             </div>
+            <div class="flex flex-col gap-4 text-gray-400">
+                <button class="p-2.5 rounded-xl hover:bg-white/10 hover:text-[#DCC9A9] transition">💬</button>
+                <button class="p-2.5 rounded-xl hover:bg-white/10 hover:text-[#DCC9A9] transition">🌐</button>
+                <button class="p-2.5 rounded-xl hover:bg-white/10 hover:text-[#DCC9A9] transition">⚙️</button>
+            </div>
+            <div class="mt-auto text-[10px] text-[#4E6851] font-mono rotate-[-90deg] tracking-widest">
+                RETRO
+            </div>
+        </aside>
 
-            <!-- Правая панель: Рабочая зона чата -->
-            <div class="flex-1 flex flex-col bg-black/20 relative">
+        <!-- Основная область мессенджера -->
+        <div class="flex-1 flex flex-col h-full overflow-hidden relative">
+            
+            <!-- Хедер -->
+            <header class="px-5 py-3.5 border-b border-[#DCC9A9]/10 flex flex-wrap items-center justify-between gap-3 bg-black/30 shrink-0">
+                <div class="flex items-center gap-3">
+                    <span class="text-[#DCC9A9] font-bold text-sm tracking-tight">Тапи - Тап <span class="text-[#B83A2D] text-xs font-normal">P2P Messenger</span></span>
+                    <span id="conn-status" class="text-[10px] px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 font-mono">
+                        Не подключено
+                    </span>
+                </div>
                 
-                <!-- Шапкa чата -->
-                <div class="p-4 border-b border-white/10 flex justify-between items-center bg-black/40 shrink-0">
+                <!-- Подключение по ID -->
+                <div class="flex items-center gap-2">
+                    <span class="text-[11px] text-gray-400 hidden lg:inline">Ваш ID:</span>
+                    <span id="my-peer-id" class="font-mono text-[11px] text-[#DCC9A9] bg-black/40 px-2.5 py-1 rounded-lg border border-[#DCC9A9]/15 max-w-[140px] truncate cursor-pointer" onclick="navigator.clipboard.writeText(this.innerText); alert('ID скопирован!');" title="Нажмите, чтобы скопировать">Генерация...</span>
+                    
+                    <input type="text" id="remote-peer-input" placeholder="ID собеседника..." class="glass-input px-3 py-1.5 rounded-lg text-xs w-36 md:w-44">
+                    <button id="connect-btn" class="btn-retro-red font-bold px-3.5 py-1.5 rounded-lg text-xs transition active:scale-95">Связаться</button>
+                    <button id="disconnect-btn" class="hidden bg-gray-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs">Сброс</button>
+                </div>
+            </header>
+
+            <!-- Чат -->
+            <div class="flex-1 flex flex-col overflow-hidden relative bg-black/20">
+                
+                <div class="px-5 py-2.5 bg-black/20 border-b border-[#DCC9A9]/10 flex justify-between items-center shrink-0">
                     <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-sm">P2P</div>
+                        <div class="w-8 h-8 rounded-full bg-[#4E6851]/40 text-[#DCC9A9] flex items-center justify-center font-bold text-xs border border-[#4E6851]/60">P2P</div>
                         <div>
-                            <h3 class="text-sm font-bold text-white">Защищенный узел связи <span class="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded ml-2">Direct</span></h3>
-                            <p class="text-[10px] text-gray-400">Данные не сохраняются на центральных серверах</p>
+                            <h3 class="text-xs font-bold text-[#DCC9A9]">Защищенный узел прямой связи</h3>
+                            <p class="text-[10px] text-gray-400">Шифрование AES-256 на клиенте</p>
                         </div>
                     </div>
-                    
-                    <!-- Кнопки звонков -->
                     <div class="flex gap-2">
-                        <button id="call-audio-btn" class="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-xl transition flex items-center gap-1.5 text-xs font-medium">
-                            <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
-                            <span>Аудио</span>
-                        </button>
-                        <button id="call-video-btn" class="bg-orange-500 hover:bg-orange-400 text-black px-3 py-2 rounded-xl transition flex items-center gap-1.5 text-xs font-bold">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                            <span>Видео</span>
-                        </button>
+                        <button id="call-audio-btn" class="bg-white/5 hover:bg-white/10 text-[#DCC9A9] px-3 py-1.5 rounded-xl text-xs border border-[#DCC9A9]/10 transition">🎧 Аудио</button>
+                        <button id="call-video-btn" class="btn-retro-red px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-md">📹 Видео</button>
                     </div>
                 </div>
 
-                <!-- Блок истории сообщений -->
-                <div id="chat-container" class="flex-1 p-6 overflow-y-auto space-y-4 flex flex-col">
-                    <div class="flex justify-center">
-                        <span class="text-[10px] bg-white/5 text-gray-400 px-3 py-1 rounded-full">⚡ Введите ID собеседника вверху и подключитесь, чтобы начать сессию</span>
+                <!-- Лента сообщений -->
+                <div id="chat-container" class="flex-1 p-5 overflow-y-auto space-y-3 flex flex-col">
+                    <div class="flex justify-center my-auto">
+                        <div class="text-center text-gray-400 text-xs glass-card p-6 rounded-2xl max-w-sm border border-[#DCC9A9]/15">
+                            🔒 <strong>Канал готов.</strong><br>Введите ID собеседника в верхней панели и нажмите «Связаться».
+                        </div>
                     </div>
                 </div>
 
-                <!-- Интерактивная панель ввода -->
-                <div class="p-4 border-t border-white/10 bg-black/40 shrink-0 flex items-center gap-3">
-                    <button class="text-gray-400 hover:text-white p-2" id="file-btn" title="Прикрепить файл">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                    </button>
+                <!-- Панель ввода -->
+                <div class="p-3.5 border-t border-[#DCC9A9]/10 bg-black/40 backdrop-blur-md shrink-0 flex items-center gap-3">
+                    <button class="text-gray-400 hover:text-[#DCC9A9] p-2 rounded-xl hover:bg-white/5 transition" id="file-btn" title="Прикрепить файл">📎</button>
                     <input type="file" id="file-input" class="hidden" multiple />
                     
-                    <button class="text-gray-400 hover:text-orange-400 p-2 microphone-btn" id="voice-btn" title="Записать голосовое (удерживайте)">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
-                    </button>
-
-                    <input type="text" id="msg-input" placeholder="Сообщение..." class="glass-input flex-1 rounded-xl px-4 py-2.5 text-xs">
+                    <button class="text-gray-400 hover:text-[#B83A2D] p-2 rounded-xl hover:bg-white/5 transition microphone-btn" id="voice-btn" title="Голосовое сообщение">🎤</button>
                     
-                    <button class="bg-orange-500 hover:bg-orange-400 text-black font-bold px-5 py-2.5 rounded-xl text-xs transition" id="send-btn">
+                    <input type="text" id="msg-input" placeholder="Введите зашифрованное сообщение..." class="glass-input flex-1 rounded-xl px-4 py-2.5 text-xs">
+                    
+                    <button class="btn-retro-red font-bold px-5 py-2.5 rounded-xl text-xs transition active:scale-95 shadow-md" id="send-btn">
                         Отправить
                     </button>
                 </div>
 
             </div>
-        </div>
-    </main>
 
-    <!-- Оверлей звонка (Glassmorphism) -->
-    <div class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex-col items-center justify-center p-4" id="call-overlay">
-        <div class="relative w-full max-w-lg h-[60vh] bg-black/60 rounded-3xl overflow-hidden border border-white/10 flex items-center justify-center mb-6">
-            <video class="w-full h-full object-cover" id="remote-video" autoplay playsinline></video>
-            <video class="absolute bottom-4 right-4 w-32 h-24 rounded-xl object-cover border-2 border-orange-500 bg-gray-900 shadow-xl" id="local-video" autoplay playsinline muted></video>
-        </div>
-        <div class="flex gap-4">
-            <button id="end-call-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold px-8 py-3 rounded-xl text-xs transition shadow-lg">Завершить</button>
-            <button id="accept-call-btn" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-8 py-3 rounded-xl text-xs transition shadow-lg">Принять</button>
         </div>
     </div>
 
-    <!-- Логика PeerJS / P2P -->
+    <!-- Оверлей звонка -->
+    <div class="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 hidden flex-col items-center justify-center p-4" id="call-overlay">
+        <div class="relative w-full max-w-md h-[60vh] glass-card rounded-3xl overflow-hidden flex items-center justify-center mb-6 border border-[#DCC9A9]/20 shadow-2xl">
+            <video class="w-full h-full object-cover" id="remote-video" autoplay playsinline></video>
+            <video class="absolute bottom-4 right-4 w-28 h-36 rounded-2xl object-cover border-2 border-[#B83A2D] bg-gray-900 shadow-xl" id="local-video" autoplay playsinline muted></video>
+        </div>
+        <div class="flex gap-4">
+            <button id="end-call-btn" class="bg-[#B83A2D] hover:bg-[#9d3126] text-white font-bold px-6 py-3 rounded-xl text-xs transition shadow-lg">Завершить</button>
+            <button id="accept-call-btn" class="hidden bg-[#4E6851] hover:bg-[#3d5240] text-[#DCC9A9] font-bold px-6 py-3 rounded-xl text-xs transition shadow-lg">Принять</button>
+        </div>
+    </div>
+
+    <!-- P2P и логика мессенджера -->
     <script>
         const peer = new Peer(undefined, { debug: 1 });
 
@@ -233,28 +222,20 @@
         peer.on('open', (id) => {
             myId = id;
             myIdSpan.textContent = id;
-            addSystemMessage('Узел инициализирован. Ваш ID выведен сверху.');
         });
 
         peer.on('error', (err) => {
-            addSystemMessage('Ошибка сети P2P: ' + err.type);
+            addSystemMessage('Ошибка сети: ' + err.type);
         });
 
         peer.on('connection', (conn) => {
-            if (currentConn) {
-                conn.close();
-                return;
-            }
+            if (currentConn) { conn.close(); return; }
             setupConnection(conn);
-            addSystemMessage('📞 Входящее соединение установлено от узла: ' + conn.peer);
+            addSystemMessage('📞 Входящее P2P соединение установлено');
         });
 
         peer.on('call', (call) => {
-            if (currentCall) {
-                call.answer();
-                call.close();
-                return;
-            }
+            if (currentCall) { call.answer(); call.close(); return; }
             callOverlay.classList.remove('hidden');
             callOverlay.classList.add('flex');
             acceptCallBtn.classList.remove('hidden');
@@ -274,9 +255,9 @@
                     call.on('close', () => endCall());
                     acceptCallBtn.classList.add('hidden');
                     endCallBtn.textContent = 'Завершить';
-                    addSystemMessage('🔊 Защищенный звонок начат');
+                    addSystemMessage('🔊 Защищенный звонок активен');
                 } catch (e) {
-                    alert('Нет доступа к камере/микрофону: ' + e.message);
+                    alert('Нет доступа к камере/микрофону');
                     endCall();
                 }
             };
@@ -284,11 +265,13 @@
 
         function setupConnection(conn) {
             currentConn = conn;
-            connStatus.textContent = '✅ Подключено (P2P)';
-            connStatus.className = 'px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+            connStatus.textContent = 'Онлайн (P2P)';
+            connStatus.className = 'text-[10px] px-2.5 py-0.5 rounded-full retro-green font-mono border border-[#4E6851]';
             connectBtn.classList.add('hidden');
             disconnectBtn.classList.remove('hidden');
             remoteInput.disabled = true;
+
+            chat.innerHTML = '';
 
             conn.on('data', (data) => {
                 try {
@@ -311,17 +294,14 @@
 
             conn.on('close', () => {
                 disconnect();
-                addSystemMessage('Собеседник разорвал соединение');
+                addSystemMessage('Собеседник отключился');
             });
         }
 
         function disconnect() {
-            if (currentConn) {
-                currentConn.close();
-                currentConn = null;
-            }
-            connStatus.textContent = '⛔ Не подключено';
-            connStatus.className = 'px-2.5 py-1 rounded-md bg-red-500/20 text-red-400 border border-red-500/30';
+            if (currentConn) { currentConn.close(); currentConn = null; }
+            connStatus.textContent = 'Не подключено';
+            connStatus.className = 'text-[10px] px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 font-mono';
             connectBtn.classList.remove('hidden');
             disconnectBtn.classList.add('hidden');
             remoteInput.disabled = false;
@@ -329,7 +309,7 @@
         }
 
         function sendText(text) {
-            if (!currentConn) return addSystemMessage('Ошибка: нет активного P2P соединения');
+            if (!currentConn) return addSystemMessage('Сначала подключитесь к собеседнику');
             const payload = JSON.stringify({ type: 'text', text });
             currentConn.send(payload);
             addMessage(text, true);
@@ -362,21 +342,21 @@
 
         function addMessage(text, self) {
             const div = document.createElement('div');
-            div.className = 'message text-xs ' + (self ? 'self' : '');
-            div.innerHTML = escapeHtml(text) + `<span class="text-[9px] opacity-60 mt-1 block text-right font-mono">${new Date().toLocaleTimeString()}</span>`;
+            div.className = 'message ' + (self ? 'self' : '');
+            div.innerHTML = escapeHtml(text) + `<span class="text-[9px] opacity-60 mt-1 block text-right font-mono">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>`;
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
         }
 
         function addFileMessage(name, url, self) {
             const div = document.createElement('div');
-            div.className = 'message text-xs ' + (self ? 'self' : '');
+            div.className = 'message ' + (self ? 'self' : '');
             div.innerHTML = `
                 <div class="flex items-center gap-2">
                     <span>📎 ${escapeHtml(name)}</span>
-                    ${url ? `<a href="${url}" download="${escapeHtml(name)}" class="text-orange-400 ml-2 underline">Скачать</a>` : ''}
+                    ${url ? `<a href="${url}" download="${escapeHtml(name)}" class="underline ml-1">Скачать</a>` : ''}
                 </div>
-                <span class="text-[9px] opacity-60 mt-1 block text-right font-mono">${new Date().toLocaleTimeString()}</span>
+                <span class="text-[9px] opacity-60 mt-1 block text-right font-mono">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
             `;
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
@@ -384,13 +364,13 @@
 
         function addVoiceMessage(url, self) {
             const div = document.createElement('div');
-            div.className = 'message text-xs ' + (self ? 'self' : '');
+            div.className = 'message ' + (self ? 'self' : '');
             div.innerHTML = `
                 <div class="flex items-center gap-2">
                     <span>🎤 Голосовое</span>
-                    <audio controls src="${url}" class="h-8 max-w-[160px]"></audio>
+                    <audio controls src="${url}" class="h-7 max-w-[140px]"></audio>
                 </div>
-                <span class="text-[9px] opacity-60 mt-1 block text-right font-mono">${new Date().toLocaleTimeString()}</span>
+                <span class="text-[9px] opacity-60 mt-1 block text-right font-mono">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
             `;
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
@@ -398,7 +378,7 @@
 
         function addSystemMessage(text) {
             const div = document.createElement('div');
-            div.className = 'self-center bg-white/5 text-gray-400 text-[10px] rounded-full px-3 py-1 my-2 font-mono';
+            div.className = 'self-center bg-white/5 text-gray-300 text-[10px] rounded-full px-3 py-1 my-1 font-mono text-center border border-[#DCC9A9]/10';
             div.textContent = text;
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
@@ -418,7 +398,7 @@
 
         connectBtn.addEventListener('click', () => {
             const remoteId = remoteInput.value.trim();
-            if (!remoteId || remoteId === myId) return addSystemMessage('Укажите корректный ID собеседника');
+            if (!remoteId || remoteId === myId) return alert('Введите корректный ID собеседника');
             const conn = peer.connect(remoteId);
             if (conn) setupConnection(conn);
         });
@@ -441,7 +421,6 @@
             fileInput.value = '';
         });
 
-        // Запись голосовых
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
@@ -468,8 +447,7 @@
                 mediaRecorder.start();
                 isRecording = true;
                 voiceBtn.classList.add('recording');
-                addSystemMessage('🎙 Запись голоса началась...');
-            }).catch(e => alert('Ошибка микрофона: ' + e.message));
+            }).catch(e => alert('Нет доступа к микрофону'));
         }
 
         function stopRecording(e) {
@@ -477,9 +455,8 @@
             if (mediaRecorder && isRecording) mediaRecorder.stop();
         }
 
-        // Звонки
         async function startCall(video) {
-            if (!currentConn) return addSystemMessage('Сначала установите соединение с чатом');
+            if (!currentConn) return alert('Сначала подключитесь к собеседнику в чате');
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
                 localStream = stream;
@@ -498,7 +475,7 @@
                 acceptCallBtn.classList.add('hidden');
                 endCallBtn.textContent = 'Завершить';
             } catch (e) {
-                alert('Ошибка медиа-устройств: ' + e.message);
+                alert('Ошибка камеры/микрофона');
             }
         }
 
