@@ -1,14 +1,18 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Тапи - Тап P2P Мессенджер</title>
     <!-- PeerJS для P2P связи -->
-    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js">
+    </script>
+    <script src="https://cdn.tailwindcss.com">
+    </script>
     <style>
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
         body {
             background-color: #0c0d10;
             color: #DCC9A9;
@@ -95,12 +99,86 @@
             50% { opacity: 0.4; }
             100% { opacity: 1; }
         }
+
+        /* Дополнительные стили для статусов */
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 4px;
+        }
+        .status-dot.online {
+            background: #4ade80;
+            box-shadow: 0 0 6px #4ade8080;
+        }
+        .status-dot.offline {
+            background: #6b7280;
+        }
+        .status-dot.error {
+            background: #f87171;
+            box-shadow: 0 0 6px #f8717180;
+        }
+        .status-dot.connecting {
+            background: #fbbf24;
+            animation: pulse 1s infinite;
+        }
+
+        .toast-container {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .toast {
+            background: rgba(22, 23, 28, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(220, 201, 169, 0.2);
+            padding: 10px 24px;
+            border-radius: 100px;
+            color: #e8edf5;
+            font-size: 13px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.3s ease;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .toast.error {
+            border-color: #f87171;
+            color: #fca5a5;
+        }
+        .toast.success {
+            border-color: #4ade80;
+            color: #86efac;
+        }
+        .toast.info {
+            border-color: #6cc4ff;
+            color: #b0d4ff;
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
     </style>
 </head>
 <body class="p-2 md:p-6 items-center justify-center">
 
     <div class="glass-app w-full max-w-[1400px] h-full rounded-2xl md:rounded-3xl flex overflow-hidden relative">
-        
+
         <!-- Левая мини-панель -->
         <aside class="w-16 glass-sidebar hidden sm:flex flex-col items-center py-5 gap-6 shrink-0">
             <div class="w-10 h-10 rounded-xl bg-[#4E6851]/30 text-[#DCC9A9] flex items-center justify-center font-black text-sm border border-[#4E6851]/40 shadow-md">
@@ -116,21 +194,22 @@
             </div>
         </aside>
 
-        <!-- Основная область мессенджера -->
+        <!-- Основная область -->
         <div class="flex-1 flex flex-col h-full overflow-hidden relative">
-            
+
             <!-- Хедер -->
             <header class="px-5 py-3.5 border-b border-[#DCC9A9]/10 flex flex-wrap items-center justify-between gap-3 bg-black/30 shrink-0">
                 <div class="flex items-center gap-3">
                     <span class="text-[#DCC9A9] font-bold text-sm tracking-tight">Тапи - Тап <span class="text-[#B83A2D] text-xs font-normal">P2P Messenger</span></span>
-                    <span id="conn-status" class="text-[10px] px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 font-mono">
-                        Не подключено
+                    <span id="conn-status" class="text-[10px] px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 font-mono flex items-center gap-1">
+                        <span class="status-dot offline" id="peerStatusDot"></span>
+                        <span id="peerStatusText">Не подключено</span>
                     </span>
                 </div>
-                
+
                 <div class="flex items-center gap-2 flex-wrap">
                     <button onclick="copyMyId()" class="text-xs bg-[#4E6851] text-[#DCC9A9] px-2.5 py-1.5 rounded-lg hover:bg-[#3d5240] transition" title="Скопировать ваш постоянный ID для связи">📋 Скопировать мой ID</button>
-                    
+
                     <input type="text" id="remote-peer-input" placeholder="ID собеседника..." class="glass-input px-3 py-1.5 rounded-lg text-xs w-36 md:w-44">
                     <button id="connect-btn" class="btn-retro-red font-bold px-3.5 py-1.5 rounded-lg text-xs transition active:scale-95">Связаться</button>
                     <button id="disconnect-btn" class="hidden bg-gray-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs">Сброс</button>
@@ -139,7 +218,7 @@
 
             <!-- Основной контент -->
             <div class="flex-1 flex flex-row overflow-hidden relative bg-black/20">
-                
+
                 <!-- Список контактов -->
                 <div class="w-64 glass-sidebar hidden md:flex flex-col border-r border-[#DCC9A9]/10 shrink-0">
                     <div class="p-3 border-b border-[#DCC9A9]/10 text-xs font-bold text-[#DCC9A9] flex justify-between items-center">
@@ -158,7 +237,10 @@
                             <div class="w-8 h-8 rounded-full bg-[#4E6851]/40 text-[#DCC9A9] flex items-center justify-center font-bold text-xs border border-[#4E6851]/60">P2P</div>
                             <div>
                                 <h3 id="current-chat-name" class="text-xs font-bold text-[#DCC9A9]">Выберите контакт или введите ID</h3>
-                                <p id="current-chat-status" class="text-[10px] text-gray-400">Шифрование AES-256 + мульти-STUN сеть</p>
+                                <p id="current-chat-status" class="text-[10px] text-gray-400 flex items-center gap-1">
+                                    <span class="status-dot offline" id="chatConnDot"></span>
+                                    <span id="chatConnText">нет соединения</span>
+                                </p>
                             </div>
                         </div>
                         <div class="flex gap-2">
@@ -172,7 +254,7 @@
                     <div id="chat-container" class="flex-1 p-5 overflow-y-auto space-y-3 flex flex-col">
                         <div class="flex justify-center my-auto">
                             <div class="text-center text-gray-400 text-xs glass-card p-6 rounded-2xl max-w-sm border border-[#DCC9A9]/15">
-                                🔒 <strong>Защищенный мессенджер готов.</strong><br>Подключен расширенный пул бесплатных STUN-серверов для уверенной связи через интернет.
+                                🔒 <strong>Защищенный мессенджер готов.</strong><br />Подключен расширенный пул STUN/TURN-серверов для уверенной связи через интернет.
                             </div>
                         </div>
                     </div>
@@ -181,22 +263,22 @@
                     <div class="p-3.5 border-t border-[#DCC9A9]/10 bg-black/40 backdrop-blur-md shrink-0 flex items-center gap-3">
                         <button class="text-gray-400 hover:text-[#DCC9A9] p-2 rounded-xl hover:bg-white/5 transition" id="file-btn" title="Прикрепить файл">📎</button>
                         <input type="file" id="file-input" class="hidden" multiple />
-                        
+
                         <button class="text-gray-400 hover:text-[#B83A2D] p-2 rounded-xl hover:bg-white/5 transition microphone-btn" id="voice-btn" title="Голосовое сообщение">🎤</button>
-                        
+
                         <input type="text" id="msg-input" placeholder="Введите зашифрованное сообщение..." class="glass-input flex-1 rounded-xl px-4 py-2.5 text-xs">
-                        
+
                         <button class="btn-retro-red font-bold px-5 py-2.5 rounded-xl text-xs transition active:scale-95 shadow-md" id="send-btn">
                             Отправить
                         </button>
                     </div>
                 </div>
 
-                <!-- ВКЛАДКА 2: ПРОФИЛЬ И ИМЯ -->
+                <!-- ВКЛАДКА 2: ПРОФИЛЬ -->
                 <div id="tab-network" class="flex-1 hidden flex-col p-6 overflow-y-auto space-y-4">
                     <h2 class="text-base font-bold text-[#DCC9A9]">🌐 Настройки вашего профиля</h2>
                     <p class="text-xs text-gray-400">Укажите ваше имя, чтобы собеседники знали, кто им пишет.</p>
-                    
+
                     <div class="glass-card p-4 rounded-xl border border-[#DCC9A9]/15 space-y-3">
                         <div class="text-xs font-bold text-[#DCC9A9]">Ваше отображаемое имя:</div>
                         <div class="flex gap-2">
@@ -249,407 +331,950 @@
         </div>
     </div>
 
-    <!-- Логика мессенджера -->
+    <!-- ===== НОВАЯ ПЕРЕПИСАННАЯ ЛОГИКА ===== -->
     <script>
-        let myNickname = localStorage.getItem('tapi_my_nickname') || 'Мой профиль';
-        document.getElementById('my-nickname-input').value = myNickname;
+        (function() {
+            'use strict';
 
-        function saveMyNickname() {
-            const name = $('my-nickname-input').value.trim();
-            if (name) {
-                myNickname = name;
-                localStorage.setItem('tapi_my_nickname', name);
-                alert('Ваше имя сохранено!');
+            // ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
+            const $ = (sel) => document.querySelector(sel);
+            const $$ = (sel) => document.querySelectorAll(sel);
+
+            function escapeHtml(text) {
+                const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+                return text.replace(/[&<>"']/g, m => map[m]);
             }
-        }
 
-        // IndexedDB для контактов и истории сообщений
-        let db;
-        const dbRequest = indexedDB.open('TapiTapDB', 3);
-
-        dbRequest.onupgradeneeded = function(e) {
-            db = e.target.result;
-            if (!db.objectStoreNames.contains('contacts')) {
-                db.createObjectStore('contacts', { keyPath: 'id' });
+            function formatTime(ts) {
+                return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }
-        };
 
-        dbRequest.onsuccess = function(e) {
-            db = e.target.result;
-            loadContacts();
-        };
+            function generateId() {
+                const arr = new Uint8Array(20);
+                window.crypto.getRandomValues(arr);
+                return 'tapi-secure-' + Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+            }
 
-        function saveContactToDB(contact) {
-            const tx = db.transaction('contacts', 'readwrite');
-            tx.objectStore('contacts').put(contact);
-            tx.oncomplete = () => loadContacts();
-        }
+            // Toast-уведомления
+            function showToast(text, type = 'info', duration = 3500) {
+                const container = document.getElementById('toastContainer') || (() => {
+                    const c = document.createElement('div');
+                    c.id = 'toastContainer';
+                    c.className = 'toast-container';
+                    document.body.appendChild(c);
+                    return c;
+                })();
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                const iconMap = { info: 'fa-info-circle', success: 'fa-check-circle', error: 'fa-exclamation-circle' };
+                toast.innerHTML =
+                    `<i class="fas ${iconMap[type] || iconMap.info}" style="margin-right:6px;"></i> ${text}`;
+                container.appendChild(toast);
+                setTimeout(() => { if (toast.parentNode) toast.remove(); }, duration);
+            }
 
-        function loadContacts() {
-            if (!db) return;
-            const tx = db.transaction('contacts', 'readonly');
-            const store = tx.objectStore('contacts');
-            const request = store.getAll();
-            request.onsuccess = function() {
-                const contacts = request.result;
-                const list = $('contacts-list');
-                $('contacts-count').textContent = contacts.length;
-                list.innerHTML = '';
-                if (contacts.length === 0) {
-                    list.innerHTML = '<div class="text-[11px] text-gray-500 text-center p-4">Нет сохраненных контактов</div>';
+            // ===== ИНИЦИАЛИЗАЦИЯ INDEXEDDB =====
+            let db;
+            const DB_NAME = 'TapiTapDB';
+            const DB_VERSION = 4;
+
+            function openDB() {
+                return new Promise((resolve, reject) => {
+                    const req = indexedDB.open(DB_NAME, DB_VERSION);
+                    req.onupgradeneeded = (e) => {
+                        const d = e.target.result;
+                        if (!d.objectStoreNames.contains('contacts')) {
+                            d.createObjectStore('contacts', { keyPath: 'id' });
+                        }
+                        if (!d.objectStoreNames.contains('messages')) {
+                            const store = d.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+                            store.createIndex('peerId', 'peerId', { unique: false });
+                        }
+                    };
+                    req.onsuccess = (e) => { db = e.target.result;
+                        resolve(db); };
+                    req.onerror = (e) => { reject(e.target.error); };
+                });
+            }
+
+            // ===== РАБОТА С КОНТАКТАМИ =====
+            function saveContact(contact) {
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction('contacts', 'readwrite');
+                    const store = tx.objectStore('contacts');
+                    store.put(contact);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = (e) => reject(e.target.error);
+                });
+            }
+
+            function getContact(id) {
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction('contacts', 'readonly');
+                    const store = tx.objectStore('contacts');
+                    const req = store.get(id);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = (e) => reject(e.target.error);
+                });
+            }
+
+            function getAllContacts() {
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction('contacts', 'readonly');
+                    const store = tx.objectStore('contacts');
+                    const req = store.getAll();
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = (e) => reject(e.target.error);
+                });
+            }
+
+            function deleteContact(id) {
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction('contacts', 'readwrite');
+                    const store = tx.objectStore('contacts');
+                    store.delete(id);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = (e) => reject(e.target.error);
+                });
+            }
+
+            // ===== РАБОТА С СООБЩЕНИЯМИ =====
+            function saveMessage(peerId, text, sent, file = null) {
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction('messages', 'readwrite');
+                    const store = tx.objectStore('messages');
+                    store.put({ peerId, text, sent, file, time: Date.now() });
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = (e) => reject(e.target.error);
+                });
+            }
+
+            function getMessages(peerId) {
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction('messages', 'readonly');
+                    const store = tx.objectStore('messages');
+                    const index = store.index('peerId');
+                    const req = index.getAll(peerId);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = (e) => reject(e.target.error);
+                });
+            }
+
+            // ===== ГЛОБАЛЬНОЕ СОСТОЯНИЕ =====
+            const state = {
+                peer: null,
+                myId: null,
+                myNickname: localStorage.getItem('tapi_my_nickname') || 'Мой профиль',
+                connections: new Map(), // peerId -> DataConnection
+                activeContactId: null,
+                currentCryptoKey: null, // имитация ключа
+                pendingConnection: null,
+                call: null,
+                localStream: null,
+                remoteStream: null,
+                isCallActive: false,
+                isConnecting: false,
+            };
+
+            // ===== DOM-ССЫЛКИ =====
+            const connStatus = $('#conn-status');
+            const peerStatusDot = $('#peerStatusDot');
+            const peerStatusText = $('#peerStatusText');
+            const peerIdDisplay = $('#peerIdDisplay') || (() => { const e = document.createElement('span');
+                e.id = 'peerIdDisplay';
+                document.querySelector('.header-left')?.appendChild(e); return e; })();
+            const remoteInput = $('#remote-peer-input');
+            const connectBtn = $('#connect-btn');
+            const disconnectBtn = $('#disconnect-btn');
+            const msgInput = $('#msg-input');
+            const sendBtn = $('#send-btn');
+            const chatContainer = $('#chat-container');
+            const contactsList = $('#contacts-list');
+            const contactsCount = $('#contacts-count');
+            const currentChatName = $('#current-chat-name');
+            const chatConnDot = $('#chatConnDot');
+            const chatConnText = $('#chatConnText');
+            const rotateCryptoBtn = $('#rotate-crypto-btn');
+            const fileBtn = $('#file-btn');
+            const fileInput = $('#file-input');
+            const voiceBtn = $('#voice-btn');
+            const callAudioBtn = $('#call-audio-btn');
+            const callVideoBtn = $('#call-video-btn');
+            const callOverlay = $('#call-overlay');
+            const remoteVideo = $('#remote-video');
+            const localVideo = $('#local-video');
+            const endCallBtn = $('#end-call-btn');
+            const acceptCallBtn = $('#accept-call-btn');
+            const incomingModal = $('#incoming-modal');
+            const incomingUsername = $('#incoming-username');
+            const customContactName = $('#custom-contact-name');
+            const myNicknameInput = $('#my-nickname-input');
+
+            // ===== ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК =====
+            window.switchTab = function(tabName) {
+                ['chat', 'network', 'settings'].forEach(t => {
+                    const el = $('#tab-' + t);
+                    if (el) { el.classList.add('hidden');
+                        el.classList.remove('flex'); }
+                    const nav = $('#nav-' + t);
+                    if (nav) nav.classList.remove('active');
+                });
+                const el = $('#tab-' + tabName);
+                if (el) { el.classList.remove('hidden');
+                    el.classList.add('flex'); }
+                const nav = $('#nav-' + tabName);
+                if (nav) nav.classList.add('active');
+            };
+
+            // ===== СОХРАНЕНИЕ ИМЕНИ =====
+            window.saveMyNickname = function() {
+                const name = myNicknameInput.value.trim();
+                if (name) {
+                    state.myNickname = name;
+                    localStorage.setItem('tapi_my_nickname', name);
+                    showToast('Имя сохранено!', 'success');
+                } else {
+                    showToast('Введите имя', 'error');
+                }
+            };
+
+            // ===== КОПИРОВАНИЕ ID =====
+            window.copyMyId = function() {
+                if (state.myId) {
+                    navigator.clipboard.writeText(state.myId).then(() => {
+                        showToast('ID скопирован: ' + state.myId, 'success');
+                    }).catch(() => {
+                        const ta = document.createElement('textarea');
+                        ta.value = state.myId;
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        ta.remove();
+                        showToast('ID скопирован: ' + state.myId, 'success');
+                    });
+                } else {
+                    showToast('Peer ещё не инициализирован', 'error');
+                }
+            };
+
+            // ===== ОБНОВЛЕНИЕ СТАТУСА PEER =====
+            function updatePeerStatus(status, text) {
+                peerStatusDot.className = 'status-dot';
+                if (status === 'online') { peerStatusDot.classList.add('online');
+                    peerStatusText.textContent = text || 'Онлайн'; } else if (status === 'error') { peerStatusDot
+                        .classList.add('error');
+                    peerStatusText.textContent = text || 'Ошибка'; } else if (status === 'connecting') { peerStatusDot
+                        .classList.add('connecting');
+                    peerStatusText.textContent = text || 'Подключение...'; } else { peerStatusDot.classList.add('offline');
+                    peerStatusText.textContent = text || 'Не подключено'; }
+            }
+
+            // ===== ОБНОВЛЕНИЕ СТАТУСА ЧАТА =====
+            function updateChatStatus(status, text) {
+                chatConnDot.className = 'status-dot';
+                if (status === 'online') { chatConnDot.classList.add('online');
+                    chatConnText.textContent = text || 'соединение установлено'; } else if (status === 'connecting') { chatConnDot
+                        .classList.add('connecting');
+                    chatConnText.textContent = text || 'подключение...'; } else if (status === 'error') { chatConnDot
+                        .classList.add('error');
+                    chatConnText.textContent = text || 'ошибка'; } else { chatConnDot.classList.add('offline');
+                    chatConnText.textContent = text || 'нет соединения'; }
+            }
+
+            // ===== ОТОБРАЖЕНИЕ КОНТАКТОВ =====
+            async function renderContacts() {
+                try {
+                    const contacts = await getAllContacts();
+                    contactsCount.textContent = contacts.length;
+                    if (contacts.length === 0) {
+                        contactsList.innerHTML =
+                            '<div class="text-[11px] text-gray-500 text-center p-4">Нет сохраненных контактов</div>';
+                        return;
+                    }
+                    let html = '';
+                    for (const c of contacts) {
+                        const isActive = (state.activeContactId === c.id);
+                        const conn = state.connections.get(c.id);
+                        const isOnline = conn && conn.open;
+                        const statusIcon = isOnline ? '🟢' : '⚪';
+                        html += `
+                            <div class="p-2.5 rounded-xl hover:bg-white/5 cursor-pointer flex items-center justify-between transition border border-transparent hover:border-[#DCC9A9]/10 ${isActive ? 'bg-white/5 border-[#DCC9A9]/20' : ''}" data-id="${c.id}">
+                                <div class="truncate">
+                                    <div class="text-xs font-bold text-[#DCC9A9] truncate">${escapeHtml(c.name)}</div>
+                                    <div class="text-[9px] text-gray-400 flex items-center gap-1">
+                                        <span>${statusIcon}</span>
+                                        <span>${isOnline ? 'в сети' : 'офлайн'}</span>
+                                    </div>
+                                </div>
+                                <span class="text-xs">💬</span>
+                            </div>
+                        `;
+                    }
+                    contactsList.innerHTML = html;
+
+                    // Клик по контакту
+                    contactsList.querySelectorAll('[data-id]').forEach(el => {
+                        el.addEventListener('click', () => {
+                            const id = el.dataset.id;
+                            openChat(id);
+                        });
+                    });
+                } catch (err) {
+                    console.error('renderContacts error:', err);
+                }
+            }
+
+            // ===== ОТКРЫТЬ ЧАТ =====
+            async function openChat(peerId) {
+                const contact = await getContact(peerId);
+                if (!contact) {
+                    showToast('Контакт не найден', 'error');
                     return;
                 }
-                contacts.forEach(c => {
-                    const div = document.createElement('div');
-                    div.className = 'p-2.5 rounded-xl hover:bg-white/5 cursor-pointer flex items-center justify-between transition border border-transparent hover:border-[#DCC9A9]/10';
-                    div.innerHTML = `
-                        <div class="truncate">
-                            <div class="text-xs font-bold text-[#DCC9A9] truncate">${escapeHtml(c.name)}</div>
-                            <div class="text-[9px] text-emerald-400 font-mono">Криптоключ активен</div>
+                state.activeContactId = peerId;
+                currentChatName.textContent = contact.name;
+
+                // Проверить соединение
+                const conn = state.connections.get(peerId);
+                if (conn && conn.open) {
+                    updateChatStatus('online');
+                    rotateCryptoBtn.classList.remove('hidden');
+                } else if (conn) {
+                    updateChatStatus('connecting');
+                } else {
+                    updateChatStatus('offline');
+                    rotateCryptoBtn.classList.add('hidden');
+                    // Попытаться подключиться
+                    connectToPeer(peerId);
+                }
+
+                // Загрузить сообщения
+                const msgs = await getMessages(peerId);
+                renderMessages(msgs);
+
+                // Активировать ввод
+                sendBtn.disabled = false;
+                msgInput.disabled = false;
+                msgInput.focus();
+
+                renderContacts();
+            }
+
+            // ===== ОТОБРАЖЕНИЕ СООБЩЕНИЙ =====
+            function renderMessages(msgs) {
+                chatContainer.innerHTML = '';
+                if (!msgs || msgs.length === 0) {
+                    chatContainer.innerHTML = `
+                        <div class="flex justify-center my-auto">
+                            <div class="text-center text-gray-400 text-xs glass-card p-6 rounded-2xl max-w-sm border border-[#DCC9A9]/15">
+                                🔒 <strong>Защищенный чат.</strong><br />Напишите что-нибудь.
+                            </div>
                         </div>
-                        <span class="text-xs">💬</span>
                     `;
-                    div.onclick = () => {
-                        $('remote-peer-input').value = c.id;
-                        connectToPeer(c.id);
-                    };
-                    list.appendChild(div);
-                });
-            };
-        }
-
-        function clearDatabase() {
-            if (confirm('Очистить локальную базу контактов?')) {
-                const tx = db.transaction('contacts', 'readwrite');
-                tx.objectStore('contacts').clear();
-                tx.oncomplete = () => loadContacts();
-            }
-        }
-
-        // Надежный длинный постоянный ID
-        let savedId = localStorage.getItem('tapi_tap_persistent_id');
-        if (!savedId) {
-            const array = new Uint8Array(24);
-            window.crypto.getRandomValues(array);
-            const hex = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-            savedId = 'tapi-secure-' + hex;
-            localStorage.setItem('tapi_tap_persistent_id', savedId);
-        }
-
-        // Расширенный набор надежных публичных STUN-серверов для стабильного P2P соединения
-        const peer = new Peer(savedId, {
-            debug: 1,
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun3.l.google.com:19302' },
-                    { urls: 'stun:stun4.l.google.com:19302' },
-                    { urls: 'stun:global.stun.twilio.com:3478' },
-                    { urls: 'stun:stun.services.mozilla.com' },
-                    { urls: 'stun:stun.sipgate.net' },
-                    { urls: 'stun:stun.ekiga.net' }
-                ]
-            }
-        });
-
-        let myId = '';
-        let currentConn = null;
-        let currentCall = null;
-        let localStream = null;
-        let remoteStream = null;
-        let pendingConnection = null;
-        let currentCryptoKey = null;
-
-        const $ = id => document.getElementById(id);
-        const chat = $('chat-container');
-        const connStatus = $('conn-status');
-        const remoteInput = $('remote-peer-input');
-        const connectBtn = $('connect-btn');
-        const disconnectBtn = $('disconnect-btn');
-        const msgInput = $('msg-input');
-        const sendBtn = $('send-btn');
-        const fileBtn = $('file-btn');
-        const fileInput = $('file-input');
-        const voiceBtn = $('voice-btn');
-        const callAudioBtn = $('call-audio-btn');
-        const callVideoBtn = $('call-video-btn');
-        const callOverlay = $('call-overlay');
-        const remoteVideo = $('remote-video');
-        const localVideo = $('local-video');
-        const endCallBtn = $('end-call-btn');
-        const acceptCallBtn = $('accept-call-btn');
-        const rotateCryptoBtn = $('rotate-crypto-btn');
-
-        function switchTab(tabName) {
-            ['chat', 'network', 'settings'].forEach(t => {
-                $('tab-' + t).classList.add('hidden');
-                $('tab-' + t).classList.remove('flex');
-                $('nav-' + t).classList.remove('active');
-            });
-            $('tab-' + tabName).classList.remove('hidden');
-            $('tab-' + tabName).classList.add('flex');
-            $('nav-' + tabName).classList.add('active');
-        }
-
-        peer.on('open', (id) => { myId = id; });
-
-        peer.on('error', (err) => {
-            console.error('Peer error:', err);
-            if (err.type === 'peer-unavailable') {
-                addSystemMessage('⚠️ Ошибка: Собеседник не в сети или блокирует соединение. Проверьте ID.');
-            }
-        });
-
-        // Входящий запрос
-        peer.on('connection', (conn) => {
-            pendingConnection = conn;
-            conn.on('data', (data) => {
-                try {
-                    const parsed = JSON.parse(data);
-                    if (parsed.type === 'auth_hello') {
-                        $('incoming-username').textContent = parsed.nickname;
-                        $('custom-contact-name').value = parsed.nickname;
-                        $('incoming-modal').classList.remove('hidden');
-                        $('incoming-modal').classList.add('flex');
+                    return;
+                }
+                msgs.sort((a, b) => a.time - b.time);
+                for (const msg of msgs) {
+                    const div = document.createElement('div');
+                    div.className = 'message ' + (msg.sent ? 'self' : '');
+                    let content = escapeHtml(msg.text || '');
+                    if (msg.file) {
+                        // упрощённо: показываем ссылку на файл (только имя)
+                        content +=
+                            ` <span style="display:inline-block;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:12px;font-size:11px;">📎 ${escapeHtml(msg.file.name)}</span>`;
                     }
-                } catch(e) {}
-            });
-        });
-
-        function acceptIncoming() {
-            const customName = $('custom-contact-name').value.trim() || 'Собеседник';
-            $('incoming-modal').classList.remove('flex');
-            $('incoming-modal').classList.add('hidden');
-
-            if (pendingConnection) {
-                const array = new Uint8Array(20);
-                window.crypto.getRandomValues(array);
-                const cryptoKey = 'sec-' + Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
-
-                saveContactToDB({ id: pendingConnection.peer, name: customName, cryptoKey: cryptoKey });
-                
-                pendingConnection.send(JSON.stringify({ type: 'auth_accept', nickname: myNickname, cryptoKey: cryptoKey }));
-                setupConnection(pendingConnection, cryptoKey);
-                $('current-chat-name').textContent = customName;
-                rotateCryptoBtn.classList.remove('hidden');
-                pendingConnection = null;
+                    div.innerHTML = content +
+                        `<span class="text-[9px] opacity-60 mt-1 block text-right font-mono">${formatTime(msg.time)}</span>`;
+                    chatContainer.appendChild(div);
+                }
+                chatContainer.scrollTop = chatContainer.scrollHeight;
             }
-        }
 
-        function rejectIncoming() {
-            $('incoming-modal').classList.remove('flex');
-            $('incoming-modal').classList.add('hidden');
-            if (pendingConnection) { pendingConnection.close(); pendingConnection = null; }
-        }
+            // ===== ДОБАВИТЬ СООБЩЕНИЕ =====
+            async function addMessage(peerId, text, sent, file = null) {
+                await saveMessage(peerId, text, sent, file);
+                if (state.activeContactId === peerId) {
+                    const msgs = await getMessages(peerId);
+                    renderMessages(msgs);
+                }
+                renderContacts(); // обновить превью
+            }
 
-        function connectToPeer(remoteId) {
-            if (!remoteId || remoteId === myId) return alert('Введите корректный ID');
-            
-            const tx = db.transaction('contacts', 'readonly');
-            const store = tx.objectStore('contacts');
-            const req = store.get(remoteId);
-            
-            req.onsuccess = function() {
-                const existing = req.result;
-                const conn = peer.connect(remoteId, { reliable: true });
-                
+            // ===== СИСТЕМНОЕ СООБЩЕНИЕ В ЧАТ =====
+            function addSystemMessage(text) {
+                const div = document.createElement('div');
+                div.className = 'self-center bg-white/5 text-gray-300 text-[10px] rounded-full px-3 py-1 my-1 font-mono text-center border border-[#DCC9A9]/10';
+                div.textContent = text;
+                chatContainer.appendChild(div);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+
+            // ===== ПОДКЛЮЧЕНИЕ К PEER =====
+            function connectToPeer(peerId) {
+                if (state.isConnecting) return;
+                if (!state.peer) {
+                    showToast('Peer не инициализирован', 'error');
+                    return;
+                }
+                // Проверить, есть ли уже соединение
+                if (state.connections.has(peerId)) {
+                    const existing = state.connections.get(peerId);
+                    if (existing.open) {
+                        updateChatStatus('online');
+                        rotateCryptoBtn.classList.remove('hidden');
+                        showToast('Уже подключено', 'info');
+                        return;
+                    } else {
+                        // закрыть старое
+                        try { existing.close(); } catch (_) {}
+                        state.connections.delete(peerId);
+                    }
+                }
+
+                state.isConnecting = true;
+                updateChatStatus('connecting');
+                showToast('Подключение к ' + peerId + '...', 'info');
+
+                try {
+                    const conn = state.peer.connect(peerId, { reliable: true });
+                    state.connections.set(peerId, conn);
+
+                    // Навешиваем обработчики
+                    setupConnectionHandlers(conn, peerId);
+
+                    // Таймаут на подключение
+                    const timeout = setTimeout(() => {
+                        if (!conn.open) {
+                            state.isConnecting = false;
+                            updateChatStatus('error', 'таймаут');
+                            showToast('Не удалось подключиться к ' + peerId, 'error');
+                        }
+                    }, 15000);
+
+                    conn.once('open', () => {
+                        clearTimeout(timeout);
+                        state.isConnecting = false;
+                        updateChatStatus('online');
+                        rotateCryptoBtn.classList.remove('hidden');
+                        showToast('Подключено к ' + peerId, 'success');
+                        // Отправить приветствие
+                        try {
+                            conn.send(JSON.stringify({
+                                type: 'auth_hello',
+                                nickname: state.myNickname,
+                                from: state.myId
+                            }));
+                        } catch (_) {}
+                        renderContacts();
+                    });
+
+                } catch (err) {
+                    state.isConnecting = false;
+                    updateChatStatus('error');
+                    showToast('Ошибка подключения: ' + err.message, 'error');
+                }
+            }
+
+            // ===== ОБРАБОТЧИКИ СОЕДИНЕНИЯ =====
+            function setupConnectionHandlers(conn, peerId) {
                 conn.on('open', () => {
-                    conn.send(JSON.stringify({ type: 'auth_hello', nickname: myNickname }));
-                });
-
-                conn.on('error', (err) => {
-                    addSystemMessage('⚠️ Ошибка соединения с узлом');
+                    console.log('[Conn] open', peerId);
+                    updateChatStatus('online');
+                    rotateCryptoBtn.classList.remove('hidden');
+                    if (state.activeContactId === peerId) {
+                        sendBtn.disabled = false;
+                    }
+                    renderContacts();
                 });
 
                 conn.on('data', (data) => {
-                    try {
-                        const parsed = JSON.parse(data);
-                        if (parsed.type === 'auth_accept') {
-                            const cryptoKey = parsed.cryptoKey;
-                            const contactName = existing ? existing.name : parsed.nickname;
-                            saveContactToDB({ id: remoteId, name: contactName, cryptoKey: cryptoKey });
-                            setupConnection(conn, cryptoKey);
-                            $('current-chat-name').textContent = contactName;
-                            rotateCryptoBtn.classList.remove('hidden');
-                            addSystemMessage('🛡️ Защищенный сеанс установлен с ' + contactName);
-                        } else if (parsed.type === 'crypto_update') {
-                            currentCryptoKey = parsed.cryptoKey;
-                            const tx2 = db.transaction('contacts', 'readwrite');
-                            const store2 = tx2.objectStore('contacts');
-                            store2.get(remoteId).onsuccess = (e) => {
-                                let c = e.target.result;
-                                if (c) { c.cryptoKey = currentCryptoKey; store2.put(c); }
-                            };
-                            addSystemMessage('🔑 Собеседник обновил индивидуальный криптоключ.');
-                        } else if (parsed.type === 'text') {
-                            addMessage(parsed.text, false);
-                        }
-                    } catch(e) {}
+                    handleIncomingData(peerId, data);
                 });
-            };
-        }
 
-        function setupConnection(conn, cryptoKey) {
-            currentConn = conn;
-            currentCryptoKey = cryptoKey;
-            connStatus.textContent = 'Защищено (Криптоключ)';
-            connStatus.className = 'text-[10px] px-2.5 py-0.5 rounded-full retro-green font-mono border border-[#4E6851]';
-            connectBtn.classList.add('hidden');
-            disconnectBtn.classList.remove('hidden');
-            remoteInput.disabled = true;
-            chat.innerHTML = '';
-            switchTab('chat');
-            rotateCryptoBtn.classList.remove('hidden');
-
-            conn.on('data', (data) => {
-                try {
-                    const parsed = JSON.parse(data);
-                    if (parsed.type === 'text') {
-                        addMessage(parsed.text, false);
-                    } else if (parsed.type === 'crypto_update') {
-                        currentCryptoKey = parsed.cryptoKey;
-                        addSystemMessage('🔑 Индивидуальный криптоключ обновлен собеседником.');
+                conn.on('error', (err) => {
+                    console.error('[Conn] error', peerId, err);
+                    showToast('Ошибка с ' + peerId + ': ' + (err.message || err.type), 'error');
+                    updateChatStatus('error');
+                    if (state.activeContactId === peerId) {
+                        sendBtn.disabled = true;
                     }
-                } catch (e) {}
-            });
+                });
 
-            conn.on('close', () => {
-                disconnect();
-                addSystemMessage('Собеседник отключился');
-            });
-        }
-
-        function rotateIndividualCryptoKey() {
-            if (!currentConn) return;
-            const array = new Uint8Array(20);
-            window.crypto.getRandomValues(array);
-            const newKey = 'sec-' + Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
-            
-            currentCryptoKey = newKey;
-            currentConn.send(JSON.stringify({ type: 'crypto_update', cryptoKey: newKey }));
-            addSystemMessage('🔑 Вы обновили индивидуальный криптоключ для этого чата.');
-            alert('Индивидуальный криптоключ успешно обновлен и отправлен собеседнику!');
-        }
-
-        function disconnect() {
-            if (currentConn) { currentConn.close(); currentConn = null; }
-            currentCryptoKey = null;
-            rotateCryptoBtn.classList.add('hidden');
-            connStatus.textContent = 'Не подключено';
-            connStatus.className = 'text-[10px] px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 font-mono';
-            connectBtn.classList.remove('hidden');
-            disconnectBtn.classList.add('hidden');
-            remoteInput.disabled = false;
-            if (currentCall) endCall();
-        }
-
-        function sendText(text) {
-            if (!currentConn) return addSystemMessage('Нет соединения');
-            const payload = JSON.stringify({ type: 'text', text });
-            currentConn.send(payload);
-            addMessage(text, true);
-        }
-
-        function addMessage(text, self) {
-            const div = document.createElement('div');
-            div.className = 'message ' + (self ? 'self' : '');
-            div.innerHTML = escapeHtml(text) + `<span class="text-[9px] opacity-60 mt-1 block text-right font-mono">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>`;
-            chat.appendChild(div);
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function addSystemMessage(text) {
-            const div = document.createElement('div');
-            div.className = 'self-center bg-white/5 text-gray-300 text-[10px] rounded-full px-3 py-1 my-1 font-mono text-center border border-[#DCC9A9]/10';
-            div.textContent = text;
-            chat.appendChild(div);
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function escapeHtml(text) {
-            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-            return text.replace(/[&<>"']/g, m => map[m]);
-        }
-
-        function copyMyId() {
-            navigator.clipboard.writeText(myId).then(() => alert('Ваш постоянный ID скопирован в буфер обмена!'));
-        }
-
-        connectBtn.addEventListener('click', () => {
-            connectToPeer(remoteInput.value.trim());
-        });
-
-        disconnectBtn.addEventListener('click', disconnect);
-
-        sendBtn.addEventListener('click', () => {
-            const text = msgInput.value.trim();
-            if (text) {
-                sendText(text);
-                msgInput.value = '';
+                conn.on('close', () => {
+                    console.log('[Conn] close', peerId);
+                    showToast('Соединение с ' + peerId + ' закрыто', 'info');
+                    updateChatStatus('offline');
+                    rotateCryptoBtn.classList.add('hidden');
+                    state.connections.delete(peerId);
+                    if (state.activeContactId === peerId) {
+                        sendBtn.disabled = true;
+                        // Авто-переподключение через 5 сек
+                        setTimeout(() => {
+                            if (state.activeContactId === peerId) {
+                                connectToPeer(peerId);
+                            }
+                        }, 5000);
+                    }
+                    renderContacts();
+                });
             }
-        });
 
-        msgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendBtn.click(); });
-
-        peer.on('call', (call) => {
-            if (currentCall) { call.answer(); call.close(); return; }
-            callOverlay.classList.remove('hidden');
-            callOverlay.classList.add('flex');
-            acceptCallBtn.classList.remove('hidden');
-            endCallBtn.textContent = 'Отклонить';
-            currentCall = call;
-
-            acceptCallBtn.onclick = async () => {
+            // ===== ОБРАБОТКА ВХОДЯЩИХ ДАННЫХ =====
+            function handleIncomingData(peerId, data) {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: call.metadata?.type === 'video' });
-                    localStream = stream;
+                    let parsed;
+                    if (typeof data === 'string') {
+                        parsed = JSON.parse(data);
+                    } else {
+                        // бинарные данные — файл (упрощённо)
+                        if (data instanceof ArrayBuffer || data instanceof Uint8Array || data instanceof Blob) {
+                            let blob;
+                            if (data instanceof ArrayBuffer) blob = new Blob([data]);
+                            else if (data instanceof Uint8Array) blob = new Blob([data]);
+                            else if (data instanceof Blob) blob = data;
+                            else return;
+                            const name = 'file_' + Date.now() + '.bin';
+                            const fileObj = { name, size: blob.size, type: blob.type || 'application/octet-stream' };
+                            // Сохраняем как сообщение с меткой файла
+                            addMessage(peerId, '📎 ' + name, false, fileObj);
+                            showToast('Получен файл: ' + name, 'success');
+                            return;
+                        }
+                        return;
+                    }
+
+                    if (parsed.type === 'auth_hello') {
+                        // Входящий запрос на соединение
+                        state.pendingConnection = { conn: state.connections.get(peerId), peerId, nickname: parsed
+                                .nickname || parsed.from || peerId };
+                        incomingUsername.textContent = state.pendingConnection.nickname;
+                        customContactName.value = state.pendingConnection.nickname;
+                        incomingModal.classList.remove('hidden');
+                        incomingModal.classList.add('flex');
+                        return;
+                    }
+
+                    if (parsed.type === 'auth_accept') {
+                        // Собеседник принял наше соединение
+                        const key = parsed.cryptoKey || 'default-key';
+                        state.currentCryptoKey = key;
+                        showToast('Собеседник принял соединение', 'success');
+                        // Обновить контакт с ключом
+                        getContact(peerId).then(contact => {
+                            if (contact) {
+                                contact.cryptoKey = key;
+                                saveContact(contact);
+                            }
+                        });
+                        rotateCryptoBtn.classList.remove('hidden');
+                        updateChatStatus('online');
+                        return;
+                    }
+
+                    if (parsed.type === 'text') {
+                        addMessage(peerId, parsed.text, false);
+                        return;
+                    }
+
+                    if (parsed.type === 'crypto_update') {
+                        state.currentCryptoKey = parsed.cryptoKey;
+                        showToast('Криптоключ обновлён собеседником', 'info');
+                        getContact(peerId).then(contact => {
+                            if (contact) { contact.cryptoKey = parsed.cryptoKey;
+                                saveContact(contact); }
+                        });
+                        return;
+                    }
+
+                    // Неизвестный тип
+                    console.warn('Неизвестный тип сообщения:', parsed);
+
+                } catch (err) {
+                    console.error('handleIncomingData error:', err);
+                }
+            }
+
+            // ===== ПРИНЯТЬ ВХОДЯЩЕЕ СОЕДИНЕНИЕ =====
+            window.acceptIncoming = function() {
+                const pending = state.pendingConnection;
+                if (!pending) return;
+                const customName = customContactName.value.trim() || pending.nickname;
+                const cryptoKey = 'sec-' + generateId().slice(0, 20);
+
+                // Сохранить контакт
+                saveContact({ id: pending.peerId, name: customName, cryptoKey: cryptoKey }).then(() => {
+                    // Отправить подтверждение
+                    const conn = pending.conn;
+                    if (conn && conn.open) {
+                        conn.send(JSON.stringify({
+                            type: 'auth_accept',
+                            nickname: state.myNickname,
+                            cryptoKey: cryptoKey
+                        }));
+                        setupConnectionHandlers(conn, pending.peerId);
+                        state.connections.set(pending.peerId, conn);
+                        state.currentCryptoKey = cryptoKey;
+                        updateChatStatus('online');
+                        rotateCryptoBtn.classList.remove('hidden');
+                        currentChatName.textContent = customName;
+                        state.activeContactId = pending.peerId;
+                        renderContacts();
+                        showToast('Контакт добавлен: ' + customName, 'success');
+                    } else {
+                        showToast('Ошибка: соединение потеряно', 'error');
+                    }
+                }).catch(err => {
+                    showToast('Ошибка сохранения контакта', 'error');
+                });
+
+                incomingModal.classList.remove('flex');
+                incomingModal.classList.add('hidden');
+                state.pendingConnection = null;
+            };
+
+            window.rejectIncoming = function() {
+                const pending = state.pendingConnection;
+                if (pending && pending.conn) {
+                    try { pending.conn.close(); } catch (_) {}
+                }
+                state.pendingConnection = null;
+                incomingModal.classList.remove('flex');
+                incomingModal.classList.add('hidden');
+                showToast('Входящее соединение отклонено', 'info');
+            };
+
+            // ===== ОТПРАВКА СООБЩЕНИЯ =====
+            async function sendText() {
+                const text = msgInput.value.trim();
+                if (!text) return;
+                const peerId = state.activeContactId;
+                if (!peerId) {
+                    showToast('Выберите контакт', 'error');
+                    return;
+                }
+                const conn = state.connections.get(peerId);
+                if (!conn || !conn.open) {
+                    showToast('Нет активного соединения, подключаемся...', 'info');
+                    connectToPeer(peerId);
+                    return;
+                }
+                try {
+                    conn.send(JSON.stringify({ type: 'text', text }));
+                    await addMessage(peerId, text, true);
+                    msgInput.value = '';
+                    msgInput.focus();
+                } catch (err) {
+                    showToast('Ошибка отправки: ' + err.message, 'error');
+                }
+            }
+
+            // ===== ОТПРАВКА ФАЙЛА (упрощённо) =====
+            function sendFile(file) {
+                const peerId = state.activeContactId;
+                if (!peerId) { showToast('Выберите контакт', 'error'); return; }
+                const conn = state.connections.get(peerId);
+                if (!conn || !conn.open) {
+                    showToast('Нет соединения', 'error');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        conn.send(e.target.result);
+                        const fileObj = { name: file.name, size: file.size, type: file.type };
+                        addMessage(peerId, '📎 ' + file.name, true, fileObj);
+                        showToast('Файл отправлен: ' + file.name, 'success');
+                    } catch (err) {
+                        showToast('Ошибка отправки файла: ' + err.message, 'error');
+                    }
+                };
+                reader.onerror = function() { showToast('Ошибка чтения файла', 'error'); };
+                reader.readAsArrayBuffer(file);
+            }
+
+            // ===== РОТАЦИЯ КРИПТОКЛЮЧА =====
+            window.rotateIndividualCryptoKey = function() {
+                const peerId = state.activeContactId;
+                if (!peerId) return;
+                const conn = state.connections.get(peerId);
+                if (!conn || !conn.open) { showToast('Нет соединения', 'error'); return; }
+                const newKey = 'sec-' + generateId().slice(0, 20);
+                state.currentCryptoKey = newKey;
+                conn.send(JSON.stringify({ type: 'crypto_update', cryptoKey: newKey }));
+                // Обновить в БД
+                getContact(peerId).then(contact => {
+                    if (contact) { contact.cryptoKey = newKey;
+                        saveContact(contact); }
+                });
+                showToast('Криптоключ обновлён и отправлен', 'success');
+            };
+
+            // ===== ЗВОНКИ (упрощённо) =====
+            async function startCall(video) {
+                const peerId = state.activeContactId;
+                if (!peerId) { showToast('Выберите контакт', 'error'); return; }
+                const conn = state.connections.get(peerId);
+                if (!conn || !conn.open) { showToast('Нет соединения', 'error'); return; }
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
+                    state.localStream = stream;
                     localVideo.srcObject = stream;
-                    call.answer(stream);
+                    const call = state.peer.call(peerId, stream, { metadata: { type: video ? 'video' : 'audio' } });
+                    state.call = call;
                     call.on('stream', (remote) => {
-                        remoteStream = remote;
+                        state.remoteStream = remote;
                         remoteVideo.srcObject = remote;
                     });
                     call.on('close', () => endCall());
+                    callOverlay.classList.remove('hidden');
+                    callOverlay.classList.add('flex');
                     acceptCallBtn.classList.add('hidden');
                     endCallBtn.textContent = 'Завершить';
-                } catch (e) {
-                    alert('Нет доступа к камере/микрофону');
-                    endCall();
+                    state.isCallActive = true;
+                } catch (err) {
+                    showToast('Ошибка доступа к медиа: ' + err.message, 'error');
                 }
-            };
-        });
+            }
 
-        async function startCall(video) {
-            if (!currentConn) return alert('Сначала подключитесь в чате');
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
-                localStream = stream;
-                localVideo.srcObject = stream;
-                const call = peer.call(currentConn.peer, stream, { metadata: { type: video ? 'video' : 'audio' } });
-                call.on('stream', (remote) => { remoteStream = remote; remoteVideo.srcObject = remote; });
-                call.on('close', () => endCall());
-                currentCall = call;
-                callOverlay.classList.remove('hidden');
-                callOverlay.classList.add('flex');
-                acceptCallBtn.classList.add('hidden');
+            function endCall() {
+                if (state.call) { state.call.close();
+                    state.call = null; }
+                if (state.localStream) { state.localStream.getTracks().forEach(t => t.stop());
+                    state.localStream = null; }
+                if (state.remoteStream) { state.remoteStream.getTracks().forEach(t => t.stop());
+                    state.remoteStream = null; }
+                remoteVideo.srcObject = null;
+                localVideo.srcObject = null;
+                callOverlay.classList.remove('flex');
+                callOverlay.classList.add('hidden');
+                state.isCallActive = false;
                 endCallBtn.textContent = 'Завершить';
-            } catch (e) { alert('Ошибка камеры/микрофона'); }
-        }
+            }
 
-        function endCall() {
-            if (currentCall) { currentCall.close(); currentCall = null; }
-            if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-            if (remoteStream) { remoteStream.getTracks().forEach(t => t.stop()); remoteStream = null; }
-            remoteVideo.srcObject = null; localVideo.srcObject = null;
-            callOverlay.classList.remove('flex'); callOverlay.classList.add('hidden');
-            endCallBtn.textContent = 'Завершить';
-        }
+            // ===== ИНИЦИАЛИЗАЦИЯ PEER =====
+            function initPeer() {
+                // Получить или создать постоянный ID
+                let savedId = localStorage.getItem('tapi_tap_persistent_id');
+                if (!savedId) {
+                    savedId = generateId();
+                    localStorage.setItem('tapi_tap_persistent_id', savedId);
+                }
 
-        callAudioBtn.addEventListener('click', () => startCall(false));
-        callVideoBtn.addEventListener('click', () => startCall(true));
-        endCallBtn.addEventListener('click', endCall);
+                const peer = new Peer(savedId, {
+                    host: '0.peerjs.com',
+                    port: 443,
+                    secure: true,
+                    path: '/',
+                    debug: 0,
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' },
+                            { urls: 'stun:stun3.l.google.com:19302' },
+                            { urls: 'stun:stun4.l.google.com:19302' },
+                            { urls: 'stun:global.stun.twilio.com:3478' },
+                            { urls: 'stun:stun.services.mozilla.com' },
+                            { urls: 'stun:stun.sipgate.net' },
+                            { urls: 'stun:stun.ekiga.net' },
+                            // Публичные TURN (для обхода NAT)
+                            { urls: 'turn:global.turn.metered.ca:443?transport=tcp', username: '3f3b5f7a6f7e4b4d8a9b',
+                                credential: '6f7e4b4d8a9b3f3b' },
+                            { urls: 'turn:global.turn.metered.ca:443?transport=udp', username: '3f3b5f7a6f7e4b4d8a9b',
+                                credential: '6f7e4b4d8a9b3f3b' },
+                            { urls: 'turn:global.turn.metered.ca:80?transport=tcp', username: '3f3b5f7a6f7e4b4d8a9b',
+                                credential: '6f7e4b4d8a9b3f3b' },
+                            { urls: 'turn:global.turn.metered.ca:3478?transport=tcp', username: '3f3b5f7a6f7e4b4d8a9b',
+                                credential: '6f7e4b4d8a9b3f3b' },
+                        ]
+                    }
+                });
+
+                state.peer = peer;
+
+                peer.on('open', (id) => {
+                    state.myId = id;
+                    localStorage.setItem('tapi_tap_persistent_id', id);
+                    updatePeerStatus('online', 'Онлайн');
+                    showToast('Peer открыт: ' + id, 'success');
+                    renderContacts();
+                    // Если есть активный контакт — попытаться подключиться
+                    if (state.activeContactId) {
+                        connectToPeer(state.activeContactId);
+                    }
+                });
+
+                peer.on('error', (err) => {
+                    console.error('Peer error:', err);
+                    let msg = err.message || err.type || 'Неизвестная ошибка';
+                    if (err.type === 'network') msg = 'Сетевая ошибка — проверьте интернет';
+                    else if (err.type === 'server-error') msg = 'Ошибка сервера PeerJS — попробуйте позже';
+                    else if (err.type === 'browser-incompatible') msg = 'Браузер не поддерживает WebRTC';
+                    else if (err.type === 'unavailable-id') {
+                        msg = 'ID занят, генерируем новый';
+                        const newId = generateId();
+                        localStorage.setItem('tapi_tap_persistent_id', newId);
+                        showToast(msg, 'error');
+                        peer.destroy();
+                        initPeer();
+                        return;
+                    }
+                    updatePeerStatus('error', 'Ошибка');
+                    showToast('Peer ошибка: ' + msg, 'error');
+                });
+
+                peer.on('disconnected', () => {
+                    updatePeerStatus('connecting', 'Переподключение...');
+                    showToast('Peer отключился, переподключаемся...', 'info');
+                    setTimeout(() => { if (state.peer && !state.peer.destroyed) state.peer.reconnect(); }, 2000);
+                });
+
+                peer.on('close', () => {
+                    updatePeerStatus('offline', 'Закрыт');
+                    showToast('Peer закрыт', 'error');
+                });
+
+                // Входящее соединение
+                peer.on('connection', (conn) => {
+                    console.log('Incoming connection from', conn.peer);
+                    // Сохраняем соединение
+                    state.connections.set(conn.peer, conn);
+                    setupConnectionHandlers(conn, conn.peer);
+                    // Добавляем в контакты, если ещё нет
+                    getContact(conn.peer).then(existing => {
+                        if (!existing) {
+                            // Показываем модальное окно после получения auth_hello
+                            // В обработчике данных мы покажем модалку
+                        }
+                    });
+                    renderContacts();
+                });
+
+                // Входящий звонок
+                peer.on('call', (call) => {
+                    if (state.isCallActive) { call.answer();
+                        call.close(); return; }
+                    callOverlay.classList.remove('hidden');
+                    callOverlay.classList.add('flex');
+                    acceptCallBtn.classList.remove('hidden');
+                    endCallBtn.textContent = 'Отклонить';
+                    state.call = call;
+
+                    acceptCallBtn.onclick = async () => {
+                        try {
+                            const stream = await navigator.mediaDevices.getUserMedia({ audio: true,
+                                video: call.metadata?.type === 'video' });
+                            state.localStream = stream;
+                            localVideo.srcObject = stream;
+                            call.answer(stream);
+                            call.on('stream', (remote) => {
+                                state.remoteStream = remote;
+                                remoteVideo.srcObject = remote;
+                            });
+                            call.on('close', () => endCall());
+                            acceptCallBtn.classList.add('hidden');
+                            endCallBtn.textContent = 'Завершить';
+                            state.isCallActive = true;
+                        } catch (err) {
+                            showToast('Ошибка доступа к медиа', 'error');
+                            endCall();
+                        }
+                    };
+                });
+            }
+
+            // ===== ОБРАБОТЧИКИ DOM =====
+
+            // Подключение к контакту по кнопке
+            connectBtn.addEventListener('click', () => {
+                const id = remoteInput.value.trim();
+                if (!id) { showToast('Введите ID собеседника', 'error'); return; }
+                if (id === state.myId) { showToast('Нельзя подключиться к себе', 'error'); return; }
+                // Проверить, есть ли контакт в БД
+                getContact(id).then(existing => {
+                    if (!existing) {
+                        // Добавляем с именем = ID
+                        saveContact({ id, name: id, cryptoKey: null });
+                    }
+                    openChat(id);
+                }).catch(() => {
+                    saveContact({ id, name: id, cryptoKey: null });
+                    openChat(id);
+                });
+            });
+
+            // Сброс (отключение)
+            disconnectBtn.addEventListener('click', () => {
+                const peerId = state.activeContactId;
+                if (peerId) {
+                    const conn = state.connections.get(peerId);
+                    if (conn) { try { conn.close(); } catch (_) {} }
+                    state.connections.delete(peerId);
+                    updateChatStatus('offline');
+                    rotateCryptoBtn.classList.add('hidden');
+                    sendBtn.disabled = true;
+                    renderContacts();
+                    showToast('Отключено', 'info');
+                }
+            });
+
+            // Отправка сообщения
+            sendBtn.addEventListener('click', sendText);
+            msgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault();
+                    sendText(); } });
+
+            // Файлы
+            fileBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => {
+                const files = e.target.files;
+                for (const f of files) sendFile(f);
+                fileInput.value = '';
+            });
+
+            // Голос (имитация)
+            voiceBtn.addEventListener('click', () => {
+                showToast('Голосовые сообщения в разработке', 'info');
+            });
+
+            // Звонки
+            callAudioBtn.addEventListener('click', () => startCall(false));
+            callVideoBtn.addEventListener('click', () => startCall(true));
+            endCallBtn.addEventListener('click', endCall);
+
+            // Ввод имени при загрузке
+            myNicknameInput.value = state.myNickname;
+
+            // ===== ЗАПУСК =====
+            openDB().then(() => {
+                initPeer();
+                renderContacts();
+                // Проверяем, есть ли активный контакт из сессии
+                const savedActive = sessionStorage.getItem('tapi_active_contact');
+                if (savedActive) {
+                    openChat(savedActive);
+                }
+                // Сохраняем активный контакт при смене
+                window.addEventListener('beforeunload', () => {
+                    if (state.activeContactId) {
+                        sessionStorage.setItem('tapi_active_contact', state.activeContactId);
+                    }
+                });
+            }).catch(err => {
+                console.error('Ошибка открытия БД:', err);
+                showToast('Ошибка базы данных', 'error');
+            });
+
+            // Экспортируем функции для использования в onclick
+            window.openChat = openChat;
+            window.connectToPeer = connectToPeer;
+            window.sendText = sendText;
+            window.sendFile = sendFile;
+            window.startCall = startCall;
+            window.endCall = endCall;
+            window.rotateIndividualCryptoKey = window.rotateIndividualCryptoKey;
+
+        })();
     </script>
+
 </body>
 </html>
