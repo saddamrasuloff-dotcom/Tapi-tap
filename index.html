@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Тапи-Тап — P2P E2EE Messenger</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}
+body{background:#0c0d10;color:#DCC9A9;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+body:before{content:"";position:fixed;inset:0;background:linear-gradient(120deg,rgba(12,13,16,.94),rgba(12,13,16,.82)),url("https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2000&auto=format&fit=crop") center/cover;z-index:-1}
+.glass-app{background:rgba(22,23,28,.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(220,201,169,.12);box-shadow:0 30px 60px rgba(0,0,0,.7)}
+.glass-sidebar,.glass-card{background:rgba(15,16,20,.72);border:1px solid rgba(220,201,169,.09)}
+.glass-input{background:rgba(0,0,0,.4);border:1px solid rgba(220,201,169,.15);color:#DCC9A9}
+.glass-input:focus{outline:none;border-color:#DCC9A9}
+.btn-red{background:#B83A2D;color:#fff}.btn-green{background:#4E6851;color:#DCC9A9}
+button:disabled{opacity:.45;cursor:not-allowed}.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.status-dot.online{background:#4ade80;box-shadow:0 0 8px #4ade8080}.status-dot.connecting{background:#fbbf24;animation:pulse 1s infinite}.status-dot.offline{background:#6b7280}.status-dot.error{background:#f87171}
+#send-btn.status-online{background:#4E6851}#send-btn.status-connecting{background:#9a7a2d}#send-btn.status-offline,#send-btn.status-error{background:#B83A2D}
+.message{max-width:min(78%,680px);padding:10px 12px;border-radius:16px;background:rgba(220,201,169,.06);border:1px solid rgba(220,201,169,.08);animation:msgIn .18s ease}
+.message.self{align-self:flex-end;background:#B83A2D;color:#fff;border:none}.message audio{width:260px;max-width:100%}.message video{max-width:300px;max-height:320px;border-radius:12px;background:#000}
+.message-meta{display:block;text-align:right;font-size:9px;opacity:.6;margin-top:5px;font-family:monospace}
+.file-card{display:flex;gap:8px;align-items:center;padding:9px;background:rgba(0,0,0,.2);border-radius:10px}
+.toast-container{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:rgba(22,23,28,.96);border:1px solid rgba(220,201,169,.2);padding:10px 18px;border-radius:999px;box-shadow:0 8px 30px #0008;font-size:12px;max-width:90vw}
+.toast.error{border-color:#f87171;color:#fca5a5}.toast.success{border-color:#4ade80;color:#86efac}
+.modal{position:fixed;inset:0;background:#000b;backdrop-filter:blur(12px);z-index:50;display:none;align-items:center;justify-content:center;padding:16px}
+.modal.open{display:flex}.drawer{transition:transform .22s ease}.overlay{display:none}
+@keyframes pulse{50%{opacity:.4}}@keyframes msgIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media(max-width:767px){
+ body{padding:0}.glass-app{border-radius:0!important;width:100%;height:100%}
+ .desktop-nav{display:none!important}.mobile-menu{display:flex!important}
+ .contacts-panel{position:absolute;z-index:30;left:0;top:0;bottom:0;width:min(86vw,340px);transform:translateX(-105%);box-shadow:20px 0 40px #0008}
+ .contacts-panel.open{transform:translateX(0)}.overlay.open{display:block;position:fixed;inset:0;background:#0008;z-index:20}
+ .message{max-width:90%}.chat-actions button{padding:7px 8px;font-size:11px}
+ .header-tools{width:100%}.header-tools input{flex:1;min-width:100px}.input-row{gap:6px!important;padding:8px!important}
+ .input-row button{min-width:40px}.input-row input{min-width:0}
+}
+@media(min-width:768px){.mobile-menu{display:none!important}}
+</style>
+</head>
+<body class="p-0 md:p-4">
+<div class="glass-app w-full max-w-[1450px] h-full md:h-[calc(100dvh-32px)] mx-auto rounded-3xl flex overflow-hidden relative">
+<aside class="desktop-nav w-16 glass-sidebar flex-col items-center py-5 gap-6 shrink-0">
+<div class="w-10 h-10 rounded-xl bg-[#4E6851]/30 flex items-center justify-center font-black">T</div>
+<button onclick="switchTab('chat')" class="p-3 rounded-xl">💬</button><button onclick="switchTab('network')" class="p-3 rounded-xl">🌐</button><button onclick="switchTab('settings')" class="p-3 rounded-xl">⚙️</button>
+<div class="mt-auto text-[10px] text-[#4E6851] rotate-[-90deg]">E2EE</div>
+</aside>
+<div class="flex-1 flex flex-col min-w-0">
+<header class="p-3 md:p-4 border-b border-[#DCC9A9]/10 bg-black/30 flex flex-wrap items-center gap-2 shrink-0">
+<button id="menu-btn" class="mobile-menu btn-green rounded-lg px-3 py-2" onclick="toggleDrawer(true)">☰</button>
+<div class="font-bold text-sm mr-auto">Тапи-Тап <span class="text-[#B83A2D] font-normal text-xs">P2P E2EE Messenger</span>
+<span id="peer-status" class="ml-2 text-[10px] inline-flex items-center gap-1"><i id="peer-dot" class="status-dot connecting"></i><span id="peer-text">Запуск...</span></span></div>
+<div class="header-tools flex items-center gap-2 flex-wrap">
+<button onclick="copyMyId()" class="btn-green rounded-lg px-3 py-2 text-xs">📋 Мой ID</button>
+<input id="remote-id" class="glass-input rounded-lg px-3 py-2 text-xs w-44" placeholder="ID собеседника">
+<button id="connect-btn" class="btn-red rounded-lg px-3 py-2 text-xs font-bold">Связаться</button>
+</div></header>
+<div id="drawer-overlay" class="overlay" onclick="toggleDrawer(false)"></div>
+<div class="flex-1 flex min-h-0 relative">
+<aside id="contacts-panel" class="contacts-panel w-64 glass-sidebar flex flex-col shrink-0">
+<div class="p-3 border-b border-[#DCC9A9]/10 flex justify-between"><b class="text-xs">👥 Контакты</b><span id="contacts-count" class="text-[10px]">0</span></div>
+<div id="contacts-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
+</aside>
+<main id="tab-chat" class="flex-1 flex flex-col min-w-0 min-h-0">
+<div class="p-3 border-b border-[#DCC9A9]/10 flex items-center gap-3 shrink-0">
+<div class="w-9 h-9 rounded-full bg-[#4E6851]/40 flex items-center justify-center">P2P</div>
+<div class="min-w-0"><div class="flex items-center gap-2"><b id="chat-name" class="text-xs truncate">Выберите контакт</b><button id="rename-btn" class="text-xs">✏️</button></div>
+<div class="text-[10px] text-gray-400 flex items-center gap-1"><i id="chat-dot" class="status-dot offline"></i><span id="chat-status">Нет соединения</span></div></div>
+<div class="chat-actions ml-auto flex gap-1 flex-wrap justify-end">
+<button id="copy-contact-id" class="bg-white/5 rounded-lg px-2 py-1.5 text-xs">📋 ID</button>
+<button id="delete-history-btn" class="bg-white/5 rounded-lg px-2 py-1.5 text-xs">🗑 История</button>
+<button id="audio-call" class="bg-white/5 rounded-lg px-2 py-1.5 text-xs">🎧</button><button id="video-call" class="bg-white/5 rounded-lg px-2 py-1.5 text-xs">📹</button>
+</div></div>
+<div id="chat-container" class="flex-1 overflow-y-auto p-3 md:p-5 space-y-3 flex flex-col"></div>
+<div class="input-row p-3 border-t border-[#DCC9A9]/10 bg-black/40 flex items-center gap-2 shrink-0">
+<button id="voice-btn" class="bg-white/5 rounded-xl px-3 py-2" title="Голосовое">🎤</button>
+<button id="video-msg-btn" class="bg-white/5 rounded-xl px-3 py-2" title="Видео">📹</button>
+<button id="file-btn" class="bg-white/5 rounded-xl px-3 py-2" title="Файл">📎</button><input id="file-input" type="file" hidden>
+<textarea id="msg-input" rows="1" class="glass-input rounded-xl px-3 py-2 flex-1 resize-none text-sm" placeholder="Сообщение..."></textarea>
+<button id="send-btn" class="status-offline rounded-xl px-4 py-2 font-bold text-sm">➤</button></div>
+</main>
+<section id="tab-network" class="hidden flex-1 overflow-auto p-5"><div class="max-w-2xl space-y-4"><h2 class="font-bold">Профиль и сеть</h2><div class="glass-card p-4 rounded-2xl space-y-3"><div class="text-xs">Ваш Peer ID</div><div id="profile-id" class="font-mono text-xs break-all"></div><div class="flex gap-2"><input id="new-peer-id" class="glass-input rounded-lg px-3 py-2 text-xs flex-1" placeholder="Новый ID"><button onclick="changePeerId()" class="btn-red rounded-lg px-3 py-2 text-xs">Сменить ID</button></div></div><div class="glass-card p-4 rounded-2xl space-y-3"><div class="text-xs font-bold">Мой никнейм</div><input id="nickname" class="glass-input rounded-lg px-3 py-2 text-sm w-full"><button onclick="saveNickname()" class="btn-green rounded-lg px-3 py-2 text-xs">Сохранить</button></div></div></section>
+<section id="tab-settings" class="hidden flex-1 overflow-auto p-5"><div class="max-w-2xl space-y-4"><h2 class="font-bold">Настройки соединения</h2><div class="glass-card p-4 rounded-2xl space-y-3"><p class="text-xs text-gray-400">Можно использовать собственный PeerServer и TURN. Публичные серверы являются резервными и не гарантируются.</p><input id="peer-host" class="glass-input rounded-lg px-3 py-2 text-xs w-full" placeholder="PeerServer host (необязательно)"><div class="grid grid-cols-2 gap-2"><input id="peer-port" class="glass-input rounded-lg px-3 py-2 text-xs" placeholder="Port"><input id="peer-path" class="glass-input rounded-lg px-3 py-2 text-xs" placeholder="Path /peerjs"></div><input id="turn-url" class="glass-input rounded-lg px-3 py-2 text-xs w-full" placeholder="TURN URL, например turns:turn.example.com:5349"><div class="grid grid-cols-2 gap-2"><input id="turn-user" class="glass-input rounded-lg px-3 py-2 text-xs" placeholder="TURN username"><input id="turn-pass" class="glass-input rounded-lg px-3 py-2 text-xs" placeholder="TURN credential"></div><button onclick="saveNetworkConfig()" class="btn-green rounded-lg px-3 py-2 text-xs">Сохранить настройки</button></div><div class="glass-card p-4 rounded-2xl"><button onclick="clearDatabase()" class="btn-red rounded-lg px-3 py-2 text-xs">Очистить локальную базу</button></div></div></section>
+</div></div></div>
+
+<div id="incoming-modal" class="modal"><div class="glass-card rounded-2xl p-6 w-full max-w-sm space-y-4"><h3 class="font-bold">Входящий запрос</h3><p class="text-xs">Пользователь: <b id="incoming-nick"></b></p><input id="incoming-name" class="glass-input rounded-lg px-3 py-2 text-sm w-full" placeholder="Имя контакта"><div class="flex gap-2"><button onclick="rejectIncoming()" class="flex-1 bg-gray-700 rounded-lg py-2 text-xs">Отклонить</button><button onclick="acceptIncoming()" class="flex-1 btn-red rounded-lg py-2 text-xs">Сохранить</button></div></div></div>
+<div id="delete-modal" class="modal"><div class="glass-card rounded-2xl p-6 w-full max-w-sm space-y-4"><h3 class="font-bold">Удалить историю?</h3><p id="delete-question" class="text-xs text-gray-300"></p><div class="flex gap-2"><button onclick="closeDeleteModal()" class="flex-1 bg-gray-700 rounded-lg py-2 text-xs">Отмена</button><button id="delete-reject" class="flex-1 bg-gray-700 rounded-lg py-2 text-xs">Отказать</button><button id="delete-accept" class="flex-1 btn-red rounded-lg py-2 text-xs">Удалить</button></div></div></div>
+<div id="video-modal" class="modal"><div class="w-full max-w-sm space-y-3"><video id="preview" autoplay muted playsinline class="w-full aspect-square object-cover rounded-2xl bg-black"></video><div class="flex gap-2"><button id="record-video" class="flex-1 btn-red rounded-xl py-3 text-xs">🔴 Запись 30с</button><button id="cancel-video" class="flex-1 bg-gray-700 rounded-xl py-3 text-xs">Отмена</button></div></div></div>
+<div id="call-modal" class="modal"><div class="w-full max-w-4xl space-y-3"><div class="grid md:grid-cols-2 gap-3"><video id="remote-video" autoplay playsinline class="w-full h-[55vh] object-cover bg-black rounded-2xl"></video><video id="local-video" autoplay muted playsinline class="w-full h-[55vh] object-cover bg-black rounded-2xl"></video></div><div class="flex justify-center"><button id="end-call" class="btn-red rounded-xl px-6 py-3">Завершить</button></div></div></div>
+<div id="toast-container" class="toast-container"></div>
+
+<script>
+/*
+ Архитектура:
+ 1. IndexedDB хранит контакты, сообщения, черновики и бинарные медиа.
+ 2. PeerJS/WebRTC обеспечивает P2P DataConnection и MediaConnection.
+ 3. ECDH P-256 формирует общий AES-GCM ключ для каждого контакта.
+ 4. Текст и служебные команды передаются через E2EE.
+ 5. Файлы и медиа передаются зашифрованными чанками 24 KB.
+ 6. MediaRecorder пишет аудио/видео максимум 30 секунд.
+ 7. Peer ID имеет стабильный contactUid для сохранения истории при миграции ID.
+ 8. Смена ID, совместное удаление истории и имена контактов синхронизируются служебными сообщениями.
+*/
+(()=>{'use strict';
+const $=s=>document.querySelector(s), now=()=>Date.now();
+const DB='TapiTapDB', VER=10, CHUNK=24*1024, MAX_MEDIA=30*1000;
+let db=null, peer=null, dbReady=false, mediaRecorder=null, mediaStream=null, videoRecorder=null, videoStream=null, videoChunks=[], audioChunks=[], videoTimer=null, incomingConn=null, pendingDelete=null;
+const state={myId:getStoredId(),myNickname:localStorage.getItem('tapi_my_nickname')||'Мой профиль',contacts:new Map(),connections:new Map(),auth:new Map(),active:null,urls:[],pendingTransfers:new Map(),identityKeys:null,call:null,reconnect:new Map()};
+$('#nickname').value=state.myNickname;$('#profile-id').textContent=state.myId;
+
+function uid(){return crypto.randomUUID?crypto.randomUUID():'tapi-'+Date.now()+'-'+Math.random().toString(36).slice(2)}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+function toast(t,type='info'){if(type==='info'&&/подключ|отключ|соединен/i.test(t))return;const e=document.createElement('div');e.className='toast '+type;e.textContent=t;$('#toast-container').appendChild(e);setTimeout(()=>e.remove(),3500)}
+function getStoredId(){return localStorage.getItem('tapi_tap_persistent_id')||(()=>{const x='tapi-'+uid().replaceAll('-','');localStorage.setItem('tapi_tap_persistent_id',x);return x})()}
+function setStatus(s,t){$('#peer-dot').className='status-dot '+s;$('#peer-text').textContent=t}
+function setChatStatus(s,t){$('#chat-dot').className='status-dot '+s;$('#chat-status').textContent=t;const b=$('#send-btn');b.classList.remove('status-online','status-connecting','status-offline','status-error');b.classList.add('status-'+s)}
+function activeConn(){return state.active?state.connections.get(state.active):null}
+function switchTab(t){['chat','network','settings'].forEach(x=>{$('#tab-'+x).classList.toggle('hidden',x!==t);$('#tab-'+x).classList.toggle('flex',x===t)})}
+window.switchTab=switchTab;
+function toggleDrawer(v){$('#contacts-panel').classList.toggle('open',v);$('#drawer-overlay').classList.toggle('open',v)}window.toggleDrawer=toggleDrawer;
+
+function tx(store,mode,fn){return new Promise((res,rej)=>{try{const t=db.transaction(store,mode),s=t.objectStore(store),r=fn(s);t.oncomplete=()=>res(r);t.onerror=()=>rej(t.error||Error('IndexedDB error'));t.onabort=()=>rej(t.error||Error('IndexedDB abort'))}catch(e){rej(e)}})}
+function req(store,method,key){return new Promise((res,rej)=>{const r=db.transaction(store,'readonly').objectStore(store)[method](key);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,VER);r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains('contacts')){const s=d.createObjectStore('contacts',{keyPath:'id'});s.createIndex('contactUid','contactUid',{unique:false})}else{const s=e.target.transaction.objectStore('contacts');if(!s.indexNames.contains('contactUid'))s.createIndex('contactUid','contactUid',{unique:false})}if(!d.objectStoreNames.contains('messages')){const s=d.createObjectStore('messages',{keyPath:'id',autoIncrement:true});s.createIndex('peerId','peerId');s.createIndex('contactUid','contactUid');s.createIndex('time','time')}else{const s=e.target.transaction.objectStore('messages');if(!s.indexNames.contains('contactUid'))s.createIndex('contactUid','contactUid');if(!s.indexNames.contains('peerId'))s.createIndex('peerId','peerId')}if(!d.objectStoreNames.contains('drafts'))d.createObjectStore('drafts',{keyPath:'contactUid'});if(!d.objectStoreNames.contains('pending'))d.createObjectStore('pending',{keyPath:'id'})};r.onsuccess=()=>{db=r.result;dbReady=true;res(db)};r.onerror=()=>rej(r.error)})}
+async function loadData(){const cs=await req('contacts','getAll');cs.forEach(c=>state.contacts.set(c.id,c));renderContacts()}
+async function saveContact(c){await tx('contacts','readwrite',s=>s.put(c));state.contacts.set(c.id,c)}
+async function contactByUid(u){return [...state.contacts.values()].find(c=>c.contactUid===u)}
+async function saveMessage(peerId,contactUid,text,sent,file=null,system=false){await tx('messages','readwrite',s=>s.add({peerId,contactUid,text:text||'',sent:!!sent,file,time:now(),system}))}
+async function messagesFor(cuid){return (await req('messages','getAll')).filter(m=>m.contactUid===cuid).sort((a,b)=>a.time-b.time)}
+async function clearHistory(cuid){await tx('messages','readwrite',s=>{const r=s.openCursor();r.onsuccess=()=>{const c=r.result;if(!c)return;if(c.value.contactUid===cuid)c.delete();c.continue()}})}
+async function saveDraft(cuid,text){await tx('drafts','readwrite',s=>s.put({contactUid:cuid,text}))}
+async function getDraft(cuid){return (await req('drafts','get',cuid))?.text||''}
+
+async function renderContacts(){const a=[...state.contacts.values()];$('#contacts-count').textContent=a.length;$('#contacts-list').innerHTML=a.length?a.map(c=>{const on=state.connections.get(c.id)?.open;return `<div class="contact-row p-2 rounded-xl hover:bg-white/5 flex items-center gap-2" data-id="${esc(c.id)}"><div class="w-8 h-8 rounded-full bg-[#4E6851]/30 flex items-center justify-center text-xs">👤</div><div class="min-w-0 flex-1"><b class="text-xs truncate block">${esc(c.name||c.remoteNickname||c.id)}</b><span class="text-[9px] text-gray-500">${on?'🟢 в сети':'⚪ офлайн'}</span></div><button class="rename-contact text-xs" data-id="${esc(c.id)}">✏️</button><button class="copy-contact text-xs" data-id="${esc(c.id)}">📋</button></div>`}).join(''):'<div class="text-xs text-gray-500 text-center p-4">Нет контактов</div>';document.querySelectorAll('.contact-row').forEach(e=>e.onclick=()=>openChat(e.dataset.id));document.querySelectorAll('.rename-contact').forEach(e=>e.onclick=x=>{x.stopPropagation();renameContact(e.dataset.id)});document.querySelectorAll('.copy-contact').forEach(e=>e.onclick=x=>{x.stopPropagation();navigator.clipboard?.writeText(e.dataset.id);toast('ID скопирован','success')})}
+async function renameContact(id){const c=state.contacts.get(id);if(!c)return;const n=prompt('Новое имя контакта:',c.name||c.remoteNickname||id);if(!n?.trim())return;c.name=n.trim();c.updatedAt=now();await saveContact(c);renderContacts();if(state.active===id)$('#chat-name').textContent=c.name}
+async function openChat(id){const c=state.contacts.get(id);if(!c)return;if(state.active&&state.active!==id)await saveDraft((state.contacts.get(state.active)||{}).contactUid,$('#msg-input').value);state.active=id;$('#chat-name').textContent=c.name||c.remoteNickname||id;$('#msg-input').value=await getDraft(c.contactUid);toggleDrawer(false);const co=state.connections.get(id);if(co?.open&&state.auth.get(id)?.authorized)setChatStatus('online','P2P + E2EE защищено');else{setChatStatus('connecting','Подключение...');connectToPeer(id)}await renderMessages()}
+async function renderMessages(){state.urls.forEach(URL.revokeObjectURL);state.urls=[];const c=state.contacts.get(state.active);$('#chat-container').innerHTML='';if(!c)return;const ms=await messagesFor(c.contactUid);for(const m of ms){const d=document.createElement('div');d.className='message '+(m.sent?'self':'');let content=m.system?`<div class="text-xs opacity-80">${esc(m.text)}</div>`:esc(m.text);if(m.file){const blob=m.file.blob instanceof Blob?m.file.blob:new Blob([m.file.data],{type:m.file.mime});const url=URL.createObjectURL(blob);state.urls.push(url);if(m.file.mediaType==='audio')content=`<audio controls src="${url}"></audio>`;else if(m.file.mediaType==='video')content=`<video controls playsinline src="${url}"></video>`;else content=`<div class="file-card">📎 <a href="${url}" download="${esc(m.file.name)}">${esc(m.file.name)}</a></div>`}d.innerHTML=content+`<span class="message-meta">${new Date(m.time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>`;$('#chat-container').appendChild(d)}$('#chat-container').scrollTop=$('#chat-container').scrollHeight}
+
+async function keys(){let p=localStorage.getItem('tapi_ecdh_priv'),q=localStorage.getItem('tapi_ecdh_pub');if(p&&q)try{return{privateKey:await crypto.subtle.importKey('jwk',JSON.parse(p),{name:'ECDH',namedCurve:'P-256'},true,['deriveKey']),publicKey:await crypto.subtle.importKey('jwk',JSON.parse(q),{name:'ECDH',namedCurve:'P-256'},true,[])}}catch{}const k=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveKey']);localStorage.setItem('tapi_ecdh_priv',JSON.stringify(await crypto.subtle.exportKey('jwk',k.privateKey)));localStorage.setItem('tapi_ecdh_pub',JSON.stringify(await crypto.subtle.exportKey('jwk',k.publicKey)));return k}
+async function derive(remote){return crypto.subtle.deriveKey({name:'ECDH',public:remote},state.identityKeys.privateKey,{name:'AES-GCM',length:256},true,['encrypt','decrypt'])}
+async function enc(key,data){const iv=crypto.getRandomValues(new Uint8Array(12));const plain=typeof data==='string'?new TextEncoder().encode(data):new Uint8Array(data);const out=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,plain);return{iv:[...iv],data:[...new Uint8Array(out)]}}
+async function dec(key,p){const out=await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(p.iv)},key,new Uint8Array(p.data));return new Uint8Array(out)}
+function sendRaw(c,o){if(!c?.open)return false;try{c.send(o);return true}catch{return false}}
+async function handshake(c){const pub=await crypto.subtle.exportKey('jwk',state.identityKeys.publicKey);sendRaw(c,{type:'auth_hello',pub,nickname:state.myNickname,contactUid:state.contacts.get(c.peer)?.contactUid||null,messageId:uid(),timestamp:now()})}
+function connectToPeer(id){if(!peer||peer.destroyed||id===state.myId)return;const old=state.connections.get(id);if(old?.open)return;if(old)try{old.close()}catch{};setChatStatus('connecting','Подключение...');const c=peer.connect(id,{reliable:true,serialization:'json'});registerConnection(c);setTimeout(()=>{if(!c.open){try{c.close()}catch{};scheduleReconnect(id)}},20000)}
+function scheduleReconnect(id){if(state.reconnect.has(id))return;const n=(state.reconnect.get(id)?.attempts||0)+1;const delay=Math.min(60000,2000*Math.pow(1.7,n-1));const timer=setTimeout(()=>{state.reconnect.delete(id);connectToPeer(id)},delay);state.reconnect.set(id,{timer,attempts:n})}
+function registerConnection(c){const id=c.peer;state.connections.set(id,c);setChatStatus('connecting','Соединение...');c.on('open',async()=>{await handshake(c);renderContacts()});c.on('data',d=>handleData(id,c,d));c.on('close',()=>{if(state.active===id)setChatStatus('offline','Нет соединения');renderContacts();scheduleReconnect(id)});c.on('error',()=>{if(state.active===id)setChatStatus('error','Ошибка соединения')})}
+
+async function handleData(id,c,m){if(!m||typeof m!=='object')return;if(m.type==='auth_hello'){try{const remote=await crypto.subtle.importKey('jwk',m.pub,{name:'ECDH',namedCurve:'P-256'},true,[]);const key=await derive(remote);state.auth.set(id,{authorized:false,aesKey:key,remoteNickname:m.nickname||id});let contact=state.contacts.get(id);if(!contact){incomingConn=c;$('#incoming-nick').textContent=m.nickname||id;$('#incoming-name').value=m.nickname||id;$('#incoming-modal').classList.add('open')}else{state.auth.get(id).authorized=true;sendRaw(c,{type:'auth_accept',messageId:uid()});if(contact.remoteNickname!==m.nickname){const old=contact.remoteNickname||contact.name;contact.remoteNickname=m.nickname||id;await saveContact(contact);if(old&&old!==m.nickname)await saveMessage(id,contact.contactUid,`Контакт «${old}» теперь называется «${m.nickname}»`,false,null,true)}if(state.active===id)setChatStatus('online','P2P + E2EE защищено');renderContacts();renderMessages()}}catch(e){console.error(e)}return}
+if(m.type==='auth_accept'){const a=state.auth.get(id);if(a){a.authorized=true;if(state.active===id)setChatStatus('online','P2P + E2EE защищено')}return}
+if(m.type==='peer_id_changed'){const c0=state.contacts.get(id)||await contactByUid(m.contactUid);if(c0){const oldId=c0.id;c0.id=m.newId;c0.remoteNickname=m.nickname||c0.remoteNickname;await tx('contacts','readwrite',s=>{s.delete(oldId);s.put(c0)});state.contacts.delete(oldId);state.contacts.set(m.newId,c0);if(state.active===oldId){state.active=m.newId}await saveMessage(m.newId,c0.contactUid,`Контакт «${c0.name||m.nickname||m.newId}» сменил ID с ${oldId} на ${m.newId}`,false,null,true);renderContacts();if(state.active===m.newId)renderMessages();connectToPeer(m.newId)}return}
+if(m.type.startsWith('delete_history_'))return handleDelete(id,m);
+if(m.type==='secure_text'){const a=state.auth.get(id);if(!a?.authorized)return;try{const text=new TextDecoder().decode(await dec(a.aesKey,m.payload));const c0=state.contacts.get(id);if(c0){await saveMessage(id,c0.contactUid,text,false);if(state.active===id)renderMessages()}}catch{toast('Ошибка расшифровки сообщения','error')}return}
+if(m.type==='media_start'){state.pendingTransfers.set(m.transferId,{...m,chunks:new Array(m.totalChunks),received:0,started:now()});return}
+if(m.type==='media_chunk'){const t=state.pendingTransfers.get(m.transferId);if(!t||t.chunks[m.index])return;t.chunks[m.index]=m.data;t.received++;return}
+if(m.type==='media_end'){const t=state.pendingTransfers.get(m.transferId);if(!t||t.received!==t.totalChunks){state.pendingTransfers.delete(m.transferId);return}try{const a=state.auth.get(id);const parts=[];for(const x of t.chunks){const p=await dec(a.aesKey,x);parts.push(p)}const blob=new Blob(parts,{type:t.mime});const c0=state.contacts.get(id);if(c0){await saveMessage(id,c0.contactUid,'',false,{name:t.name,mime:t.mime,mediaType:t.mediaType,size:t.size,blob});if(state.active===id)renderMessages()}}catch(e){toast('Ошибка получения медиа','error')}state.pendingTransfers.delete(m.transferId);return}}
+async function sendText(){const text=$('#msg-input').value.trim(),c=state.contacts.get(state.active),co=activeConn(),a=state.auth.get(state.active);if(!text||!c)return;if(!co?.open||!a?.authorized){setChatStatus('connecting','Подключение...');connectToPeer(state.active);return}try{const payload=await enc(a.aesKey,text);if(sendRaw(co,{type:'secure_text',payload,messageId:uid()})){await saveMessage(state.active,c.contactUid,text,true);$('#msg-input').value='';renderMessages()}}catch{toast('Ошибка отправки','error')}}
+async function sendMedia(blob,mediaType,name){const c=state.contacts.get(state.active),co=activeConn(),a=state.auth.get(state.active);if(!c||!co?.open||!a?.authorized){toast('Нет защищённого соединения','error');return}const transferId=uid(),bytes=new Uint8Array(await blob.arrayBuffer()),total=Math.ceil(bytes.length/CHUNK);sendRaw(co,{type:'media_start',transferId,name,mime:blob.type,mediaType,size:bytes.length,totalChunks:total});for(let i=0;i<total;i++){const part=bytes.slice(i*CHUNK,(i+1)*CHUNK);const cipher=await enc(a.aesKey,part);if(!sendRaw(co,{type:'media_chunk',transferId,index:i,data:cipher})){toast('Передача прервана','error');return}await new Promise(r=>setTimeout(r,0))}sendRaw(co,{type:'media_end',transferId});await saveMessage(state.active,c.contactUid,'',true,{name,mime:blob.type,mediaType,size:bytes.length,blob});renderMessages()}
+function chooseMime(list){return list.find(x=>MediaRecorder.isTypeSupported(x))||''}
+async function startVoice(){if(mediaRecorder?.state==='recording'){mediaRecorder.stop();return}if(!state.active){toast('Выберите контакт','error');return}try{mediaStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});const mime=chooseMime(['audio/webm;codecs=opus','audio/webm','audio/mp4']);mediaRecorder=new MediaRecorder(mediaStream,mime?{mimeType:mime}:undefined);audioChunks=[];mediaRecorder.ondataavailable=e=>e.data.size&&audioChunks.push(e.data);mediaRecorder.onerror=()=>cleanupVoice();mediaRecorder.onstop=async()=>{try{const b=new Blob(audioChunks,{type:mime||'audio/webm'});await sendMedia(b,'audio','audio-msg-'+Date.now()+'.webm')}catch{toast('Ошибка отправки голосового сообщения','error')}finally{cleanupVoice()}};mediaRecorder.start(1000);$('#voice-btn').textContent='⏹';setTimeout(()=>{if(mediaRecorder?.state==='recording')mediaRecorder.stop()},MAX_MEDIA)}catch{toast('Нет доступа к микрофону','error');cleanupVoice()}}
+function cleanupVoice(){try{mediaStream?.getTracks().forEach(t=>t.stop())}catch{}mediaStream=null;mediaRecorder=null;audioChunks=[];$('#voice-btn').textContent='🎤'}
+async function openVideoRecorder(){if(!state.active)return toast('Выберите контакт','error');try{videoStream=await navigator.mediaDevices.getUserMedia({audio:true,video:true});$('#preview').srcObject=videoStream;$('#video-modal').classList.add('open')}catch{toast('Нет доступа к камере и микрофону','error')}}
+function closeVideo(){clearTimeout(videoTimer);try{videoRecorder?.stop()}catch{}try{videoStream?.getTracks().forEach(t=>t.stop())}catch{}videoRecorder=null;videoStream=null;videoChunks=[];$('#preview').srcObject=null;$('#video-modal').classList.remove('open');$('#record-video').textContent='🔴 Запись 30с'}
+function recordVideo(){if(videoRecorder?.state==='recording'){videoRecorder.stop();return}const mime=chooseMime(['video/webm;codecs=vp8,opus','video/webm']);try{videoChunks=[];videoRecorder=new MediaRecorder(videoStream,mime?{mimeType:mime}:undefined);videoRecorder.ondataavailable=e=>e.data.size&&videoChunks.push(e.data);videoRecorder.onerror=()=>closeVideo();videoRecorder.onstop=async()=>{try{await sendMedia(new Blob(videoChunks,{type:mime||'video/webm'}),'video','video-msg-'+Date.now()+'.webm')}catch{toast('Ошибка отправки видео','error')}finally{closeVideo()}};videoRecorder.start(1000);$('#record-video').textContent='⏹ Остановить';videoTimer=setTimeout(()=>{if(videoRecorder?.state==='recording')videoRecorder.stop()},MAX_MEDIA)}catch{toast('Браузер не поддерживает видеозапись','error')}}
+async function handleDelete(id,m){const c=state.contacts.get(id);if(!c)return;if(m.type==='delete_history_request'){pendingDelete={id,requestId:m.requestId,cuid:c.contactUid};$('#delete-question').textContent=`Пользователь «${c.name||id}» запрашивает удаление всей истории этого чата. Согласны?`;$('#delete-modal').classList.add('open');$('#delete-accept').onclick=async()=>{sendRaw(state.connections.get(id),{type:'delete_history_accept',requestId:m.requestId});await clearHistory(c.contactUid);$('#delete-modal').classList.remove('open');await saveMessage(id,c.contactUid,'История чата удалена по обоюдному согласию',false,null,true);renderMessages()};$('#delete-reject').onclick=()=>{sendRaw(state.connections.get(id),{type:'delete_history_reject',requestId:m.requestId});$('#delete-modal').classList.remove('open')};return}if(m.type==='delete_history_accept'){await clearHistory(c.contactUid);sendRaw(state.connections.get(id),{type:'delete_history_execute',requestId:m.requestId});await saveMessage(id,c.contactUid,'История чата удалена по обоюдному согласию',false,null,true);if(state.active===id)renderMessages();return}if(m.type==='delete_history_execute'){await clearHistory(c.contactUid);await saveMessage(id,c.contactUid,'История чата удалена по обоюдному согласию',false,null,true);if(state.active===id)renderMessages();return}if(m.type==='delete_history_reject'){toast('Собеседник отказался удалять историю','error')}}
+async function requestDelete(){const c=state.contacts.get(state.active),co=activeConn();if(!c||!co?.open)return toast('Нет соединения','error');if(!confirm('Запросить удаление всей истории этого чата у обоих участников?'))return;sendRaw(co,{type:'delete_history_request',requestId:uid(),contactUid:c.contactUid,timestamp:now()})}
+function rejectIncoming(){if(incomingConn)sendRaw(incomingConn,{type:'auth_reject'});incomingConn=null;$('#incoming-modal').classList.remove('open')}
+async function acceptIncoming(){if(!incomingConn)return;const id=incomingConn.peer,n=$('#incoming-name').value.trim()||$('#incoming-nick').textContent;const c={id,contactUid:uid(),name:n,remoteNickname:$('#incoming-nick').textContent,createdAt:now()};await saveContact(c);const a=state.auth.get(id);if(a)a.authorized=true;sendRaw(incomingConn,{type:'auth_accept'});$('#incoming-modal').classList.remove('open');incomingConn=null;renderContacts();openChat(id)}
+window.rejectIncoming=rejectIncoming;window.acceptIncoming=acceptIncoming;
+async function changePeerId(){const newId=$('#new-peer-id').value.trim();if(!/^[a-zA-Z0-9_-]{3,100}$/.test(newId)||newId===state.myId)return toast('Некорректный новый ID','error');if(!confirm('Сменить Peer ID? Контакты будут автоматически уведомлены после регистрации нового ID.'))return;const oldId=state.myId;const contacts=[...state.contacts.values()];for(const c of state.connections.values())try{c.close()}catch{};try{peer?.destroy()}catch{};state.connections.clear();state.auth.clear();state.myId=newId;localStorage.setItem('tapi_tap_persistent_id',newId);$('#profile-id').textContent=newId;peer=null;initPeer(true,oldId,contacts)}
+window.changePeerId=changePeerId;
+function peerOptions(){const cfg={debug:0,config:{iceServers:[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']},{urls:'stun:stun.cloudflare.com:3478'},{urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},{urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},{urls:'turn:openrelay.metered.ca:3478?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}]}};const h=localStorage.getItem('tapi_peer_host'),p=localStorage.getItem('tapi_peer_port'),path=localStorage.getItem('tapi_peer_path');if(h){cfg.host=h;if(p)cfg.port=Number(p);if(path)cfg.path=path}const tu=localStorage.getItem('tapi_turn_url');if(tu)cfg.config.iceServers.unshift({urls:tu,username:localStorage.getItem('tapi_turn_user')||'',credential:localStorage.getItem('tapi_turn_pass')||''});return cfg}
+async function initPeer(changing=false,oldId=null,contacts=[]){setStatus('connecting','Регистрация P2P...');try{peer=new Peer(state.myId,peerOptions())}catch(e){setStatus('error','Ошибка PeerJS');return}peer.on('open',async()=>{setStatus('online','P2P сервер доступен');$('#profile-id').textContent=state.myId;if(changing&&oldId){for(const c of contacts){const co=state.connections.get(c.id);if(co?.open)sendRaw(co,{type:'peer_id_changed',oldId,newId:state.myId,contactUid:c.contactUid,nickname:state.myNickname,messageId:uid()});else{const tmp=peer.connect(c.id,{reliable:true,serialization:'json'});tmp.on('open',()=>{sendRaw(tmp,{type:'peer_id_changed',oldId,newId:state.myId,contactUid:c.contactUid,nickname:state.myNickname,messageId:uid()});setTimeout(()=>tmp.close(),1000)})}}}for(const c of state.contacts.values())if(c.id!==state.myId)connectToPeer(c.id)});
+peer.on('connection',registerConnection);peer.on('error',e=>{console.error(e);if(e.type==='peer-unavailable'){if(state.active)setChatStatus('error','Собеседник недоступен')}else{setStatus('error','Ошибка P2P');setTimeout(()=>{try{peer?.reconnect()}catch{}},4000)}});peer.on('disconnected',()=>setStatus('connecting','Переподключение P2P...'));peer.on('close',()=>setStatus('offline','P2P закрыт'));peer.on('call',handleCall)}
+function handleCall(call){state.call=call;$('#call-modal').classList.add('open');call.on('stream',s=>{$('#remote-video').srcObject=s});call.answer(null)}
+async function startCall(video){const c=state.active,co=state.connections.get(c);if(!c||!co?.open)return toast('Нет соединения','error');try{const s=await navigator.mediaDevices.getUserMedia({audio:true,video});state.call=peer.call(c,s);$('#local-video').srcObject=s;$('#call-modal').classList.add('open');state.call.on('stream',x=>$('#remote-video').srcObject=x);state.call.on('close',endCall)}catch{toast('Не удалось начать звонок','error')}}
+function endCall(){try{state.call?.close()}catch{}try{$('#local-video').srcObject?.getTracks().forEach(t=>t.stop())}catch{}try{$('#remote-video').srcObject?.getTracks().forEach(t=>t.stop())}catch{}$('#local-video').srcObject=null;$('#remote-video').srcObject=null;state.call=null;$('#call-modal').classList.remove('open')}
+function saveNetworkConfig(){[['peer-host','tapi_peer_host'],['peer-port','tapi_peer_port'],['peer-path','tapi_peer_path'],['turn-url','tapi_turn_url'],['turn-user','tapi_turn_user'],['turn-pass','tapi_turn_pass']].forEach(([a,b])=>localStorage.setItem(b,$('#'+a).value.trim()));toast('Настройки сети сохранены','success')}
+window.saveNetworkConfig=saveNetworkConfig;
+function saveNickname(){const n=$('#nickname').value.trim();if(!n)return;state.myNickname=n;localStorage.setItem('tapi_my_nickname',n);toast('Имя сохранено','success')}
+window.saveNickname=saveNickname;
+function copyMyId(){navigator.clipboard?.writeText(state.myId);toast('ID скопирован','success')}
+window.copyMyId=copyMyId;
+async function clearDatabase(){if(!confirm('Удалить локальные контакты и историю?'))return;db.close();indexedDB.deleteDatabase(DB);location.reload()}
+$('#connect-btn').onclick=()=>{const id=$('#remote-id').value.trim();if(!id)return;if(state.contacts.has(id))openChat(id);else{const c={id,contactUid:uid(),name:id,remoteNickname:id,createdAt:now()};saveContact(c).then(()=>{renderContacts();openChat(id)})}}
+$('#send-btn').onclick=sendText;$('#msg-input').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendText()}};$('#msg-input').oninput=()=>{if(state.active){const c=state.contacts.get(state.active);saveDraft(c.contactUid,$('#msg-input').value)}}
+$('#voice-btn').onclick=startVoice;$('#video-msg-btn').onclick=openVideoRecorder;$('#record-video').onclick=recordVideo;$('#cancel-video').onclick=closeVideo;$('#file-btn').onclick=()=>$('#file-input').click();$('#file-input').onchange=async e=>{const f=e.target.files?.[0];if(f){if(f.size>15*1024*1024)return toast('Файл больше 15 МБ','error');await sendMedia(f,'file',f.name)}e.target.value=''}
+$('#delete-history-btn').onclick=requestDelete;$('#rename-btn').onclick=()=>state.active&&renameContact(state.active);$('#copy-contact-id').onclick=()=>state.active&&navigator.clipboard?.writeText(state.active);$('#audio-call').onclick=()=>startCall(false);$('#video-call').onclick=()=>startCall(true);$('#end-call').onclick=endCall;
+$('#peer-host').value=localStorage.getItem('tapi_peer_host')||'';$('#peer-port').value=localStorage.getItem('tapi_peer_port')||'';$('#peer-path').value=localStorage.getItem('tapi_peer_path')||'';$('#turn-url').value=localStorage.getItem('tapi_turn_url')||'';$('#turn-user').value=localStorage.getItem('tapi_turn_user')||'';$('#turn-pass').value=localStorage.getItem('tapi_turn_pass')||'';
+async function boot(){try{await openDB();state.identityKeys=await keys();await loadData();setStatus('connecting','Запуск P2P...');initPeer()}catch(e){console.error(e);setStatus('error','Ошибка запуска');toast('Ошибка запуска приложения','error')}}
+boot();
+})();
+</script>
+</body>
+</html>
